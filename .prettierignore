@@ -1,0 +1,4 @@
+dist
+bun.lock
+src-tauri/target
+src-tauri/gen

@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #f4f4f2;
+  --color-surface: #ffffff;
+  --color-line: #d9d9d4;
+  --color-ink: #1c1c1a;
+  --color-muted: #6b6b66;
+  --color-accent: #2f7d4f;
+  --color-on-accent: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #171816;
+    --color-surface: #20221f;
+    --color-line: #353832;
+    --color-ink: #ecece8;
+    --color-muted: #9a9c94;
+    --color-accent: #4fae76;
+    --color-on-accent: #0e120f;
+  }
+}

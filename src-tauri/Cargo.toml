@@ -1,0 +1,24 @@
+[package]
+name = "cwo-mod-launcher"
+version = "0.1.0"
+description = "Launcher and mod manager for Cube World Omega"
+license = "GPL-3.0-only"
+edition = "2024"
+
+[lib]
+# distinct from the bin name, same-named lib and bin collide on Windows
+name = "cwo_mod_launcher_lib"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
