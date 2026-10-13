@@ -58,11 +58,21 @@ Open http://localhost:1420. Calls to the backend do not work there.
 
 ## Backend
 
-The code is in `src-tauri/src/`. Tauri settings are in
-`src-tauri/tauri.conf.json`.
+The backend is a Cargo workspace:
 
-Functions marked `#[tauri::command]` in `lib.rs` are what the frontend can
-call with `invoke`.
+- `crates/core/` is the mod loader as a library, with no Tauri in it: finding
+  the game, reading and ordering mods, analysing the client DLLs and planning
+  the patches. Each kind of mod content is one module in `src/features/`.
+- `crates/cli/` is a small command line tool over the library, for trying
+  things without the app:
+  `cargo run -p cwoml-cli -- plan --mods <folder> --out <folder>`
+- `src-tauri/` is the app. Tauri settings are in `src-tauri/tauri.conf.json`.
+
+Functions marked `#[tauri::command]` in `src-tauri/src/lib.rs` are what the
+frontend can call with `invoke`.
+
+The tests in `crates/core` run without the game:
+`cargo test -p cwoml-core`
 
 ## Before committing
 
@@ -83,9 +93,9 @@ bun run tauri build
 
 There are no installers. The output is:
 
-- Windows: `src-tauri/target/release/cwo-mod-launcher.exe`
-- Linux: an AppImage under `src-tauri/target/release/bundle/`
-- macOS: a `.app` under `src-tauri/target/release/bundle/macos/`
+- Windows: `target/release/cwo-mod-launcher.exe`
+- Linux: an AppImage under `target/release/bundle/`
+- macOS: a `.app` under `target/release/bundle/macos/`
 
 Run that file to start the built app. It can be copied anywhere first.
 
@@ -94,6 +104,22 @@ Run that file to start the built app. It can be copied anywhere first.
 The launcher keeps its data in a `cwoml-data` folder beside the executable
 (beside the AppImage file on Linux). If that folder cannot be created, and
 always on macOS, it uses the per-user app data folder instead.
+
+Mods are imported in the app as `.zip` files, from Manage mods or by dropping
+them on the window. A mod zip has a `mod.json` at its top level, or
+inside a single top-level folder. It is unpacked into `cwoml-data/mods/<id>`.
+Importing a mod that is already there replaces it, and asks first when the
+zip is the older version.
+
+Every imported mod is in that one folder, whichever profiles use it. Deleting
+a mod removes it from the folder and from every profile.
+
+A mod can ship a picture for the mod list: an `icon.png` beside `mod.json`,
+or the file named by `"icon"` in `mod.json` (png, jpg or webp, up to 512 KB).
+
+Profiles are in `cwoml-data/profiles.json`. A profile lists the mods added to
+it, which of them are on, and their order. A new profile starts empty or as a
+copy of another one.
 
 ## License
 
