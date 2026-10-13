@@ -1,4 +1,4 @@
 dist
 bun.lock
-src-tauri/target
+target
 src-tauri/gen

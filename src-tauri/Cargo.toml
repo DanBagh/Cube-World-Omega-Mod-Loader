@@ -13,12 +13,8 @@ name = "cwo_mod_launcher_lib"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+cwoml-core = { path = "../crates/core" }
 tauri = { version = "2", features = [] }
-serde = { version = "1", features = ["derive"] }
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
-panic = "abort"
-strip = true
+serde.workspace = true
+tauri-plugin-dialog = "2.8.2"
+base64 = "0.23.1"

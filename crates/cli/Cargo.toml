@@ -1,0 +1,13 @@
+[package]
+name = "cwoml-cli"
+description = "Command line front end to the mod loader, for development and testing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cwoml"
+path = "src/main.rs"
+
+[dependencies]
+cwoml-core = { path = "../core" }
