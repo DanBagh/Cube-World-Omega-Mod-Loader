@@ -1,24 +1,22 @@
-//! The client's numbered sounds, and sounds a mod adds: the `"sounds"` manifest section.
-//!
-//! The client loads each sound file into a slot with a fixed id. Its table has a fixed
-//! size, but it asks for a few files it does not ship. A mod's own sound is served under
-//! such a name, which gives it an id without replacing anything the game plays today.
+//! The client's numbered sounds: the id it loads each sound file under. Sounds a mod adds
+//! are `added_sounds`.
 //!
 //! Build-specific: the ids are read from the client's sound loader.
 
 use std::collections::BTreeMap;
 
-use super::files::Override;
 use super::stub::signature;
 use super::text::latin1;
-use crate::game::Game;
-use crate::mods::Mod;
 use crate::pe::PeImage;
 use crate::refs::{RefIndex, SiteKind, string_sites};
-use crate::report::Report;
 
-/// Name of an added sound to the game path of the slot it took, empty when it found none.
-pub type Added = BTreeMap<String, String>;
+/// The sounds the mods add: the id each name plays under, and whether this client can play
+/// them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Added {
+    pub ids: BTreeMap<String, u16>,
+    pub playable: bool,
+}
 
 /// The id the client loads a sound file under: `lea reg, [path]` ... `mov dx, <id>`.
 pub fn sound_id(image: &PeImage, refs: &RefIndex, path: &str) -> Option<u16> {
@@ -64,105 +62,20 @@ pub fn game_sounds(image: &PeImage, refs: &RefIndex) -> Vec<(String, u16)> {
     found
 }
 
-fn valid_name(name: &str) -> bool {
-    let allowed =
-        |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '.' | '-');
-    name.chars().all(allowed) && name.starts_with(|c: char| c.is_ascii_alphanumeric())
-}
-
-/// Gives each sound the mods add one of the client's unused slots, and serves the mod's
-/// file under that slot's name. When two mods add a sound of the same name, the later wins.
-pub fn add(
-    game: &Game,
-    mods: &[Mod],
-    order: &[usize],
-    image: &PeImage,
-    refs: &RefIndex,
-    overrides: &mut BTreeMap<String, Override>,
-    report: &mut Report,
-) -> Added {
-    let mut wanted: Vec<(String, Override)> = Vec::new();
-    for found in order.iter().map(|&index| &mods[index]) {
-        let id = &found.id;
-        for (name, source) in found.object("sounds").into_iter().flatten() {
-            let relative = source.as_str().unwrap_or_default();
-            let file = found.file(relative).filter(|path| {
-                path.extension()
-                    .is_some_and(|e| e.eq_ignore_ascii_case("wav"))
-            });
-            if !valid_name(name) {
-                report.warn(format!("{id}: sound name '{name}' must be lowercase letters, digits, '.', '_' or '-'; skipped"));
-                continue;
-            }
-            let Some(source) = file else {
-                report.warn(format!(
-                    "{id}: sound '{relative}' must be a .wav file inside the mod folder; skipped"
-                ));
-                continue;
-            };
-            let sound = Override {
-                source,
-                owner: id.clone(),
-            };
-            match wanted.iter_mut().find(|(known, _)| known == name) {
-                Some((_, earlier)) => {
-                    if earlier.owner != *id {
-                        report.warn(format!(
-                            "sound '{name}' is defined by {} and {id}; {id} wins",
-                            earlier.owner
-                        ));
-                    }
-                    *earlier = sound;
-                }
-                None => wanted.push((name.clone(), sound)),
-            }
-        }
-    }
-    let mut added = Added::new();
-    if wanted.is_empty() {
-        return added;
-    }
-    let mut free: Vec<(u16, String)> = game_sounds(image, refs)
-        .into_iter()
-        .filter(|(path, _)| {
-            !game.root.join(path).is_file() && !overrides.contains_key(&path.to_lowercase())
-        })
-        .map(|(path, id)| (id, path))
-        .collect();
-    free.sort();
-    let slots = free.len();
-    let mut free = free.into_iter();
-    for (name, sound) in wanted {
-        let Some((_, path)) = free.next() else {
-            report.warn(format!(
-                "{}: no unused sound slot left for '{name}' (this build has {slots}); skipped",
-                sound.owner
-            ));
-            // known, with nowhere to go: see `unknown`
-            added.insert(name, String::new());
-            continue;
-        };
-        report.say(format!(
-            "Added sound '{name}' ({}) uses the client's unused slot {path}",
-            sound.owner
-        ));
-        overrides.insert(path.to_lowercase(), sound);
-        added.insert(name, path);
-    }
-    added
-}
-
 /// The id of a sound a mod names: a game path, or the name of an added sound.
 pub fn resolve(image: &PeImage, refs: &RefIndex, added: &Added, sound: &str) -> Option<u16> {
-    sound_id(image, refs, added.get(sound).map_or(sound, String::as_str))
+    match added.ids.get(sound) {
+        Some(&id) => added.playable.then_some(id),
+        None => sound_id(image, refs, sound),
+    }
 }
 
 /// Why `resolve` found nothing, for a report line.
 pub fn unknown(added: &Added, sound: &str) -> &'static str {
     if sound.contains('/') {
         "is not a sound the game loads"
-    } else if added.contains_key(sound) {
-        "is an added sound that found no slot in this game version"
+    } else if added.ids.contains_key(sound) {
+        "is an added sound, and this game version cannot play added sounds"
     } else {
         "is not a sound this mod set adds (see \"sounds\")"
     }
@@ -171,9 +84,6 @@ pub fn unknown(added: &Added, sound: &str) -> &'static str {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::game::Backend;
-    use crate::mods::load;
-    use crate::mods::tests::write_mod;
     use crate::testing::TinyPe;
 
     /// Adds the client's loading of `path` under `id`: lea rcx, [path] / mov dx, id.
@@ -206,89 +116,29 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn added_sounds_take_the_slots_whose_files_are_missing() {
+    fn added_sounds_resolve_where_they_can_be_played() {
         let mut pe = TinyPe::new();
         loads(&mut pe, "sounds/pickup.wav", 0x3D);
-        loads(&mut pe, "sounds/rain.wav", 0x70);
-        loads(&mut pe, "sounds/cry.wav", 0x6B);
         let image = pe.build();
         let refs = RefIndex::build(&image).unwrap();
-
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().join("game");
-        std::fs::create_dir_all(root.join("sounds")).unwrap();
-        std::fs::write(root.join("sounds/pickup.wav"), b"x").unwrap();
-        let game = Game {
-            root,
-            release: "gh-1".into(),
-            version: None,
-            commit: String::new(),
-            managed: false,
-            modules: BTreeMap::from([(Backend::Avx2, dir.path().join("client.dll"))]),
+        let mut added = Added {
+            ids: BTreeMap::from([("chime".to_owned(), 0x8000)]),
+            playable: true,
         };
-        let mods_dir = dir.path().join("mods");
-        for (folder, manifest) in [
-            (
-                "a",
-                r#"{"schema": 1, "id": "a", "version": "1.0.0", "sounds": {
-                    "chime": "chime.wav", "Bad Name": "chime.wav", "text": "notes.txt", "gone": "gone.wav"}}"#,
-            ),
-            (
-                "b",
-                r#"{"schema": 1, "id": "b", "version": "1.0.0", "sounds": {
-                    "chime": "other.wav", "second": "other.wav", "third": "other.wav"}}"#,
-            ),
-        ] {
-            let folder = write_mod(&mods_dir, folder, manifest);
-            for file in ["chime.wav", "other.wav", "notes.txt"] {
-                std::fs::write(folder.join(file), b"RIFF").unwrap();
-            }
-        }
-        let mods = load(&mods_dir);
-        let mut overrides = BTreeMap::new();
-        let mut report = Report::default();
-        let added = add(
-            &game,
-            &mods,
-            &[0, 1],
-            &image,
-            &refs,
-            &mut overrides,
-            &mut report,
-        );
-
-        // the lower id first, in the order the names were first seen. b's chime replaced a's,
-        // and the third found no slot
-        assert_eq!(
-            added,
-            Added::from([
-                ("chime".to_owned(), "sounds/cry.wav".to_owned()),
-                ("second".to_owned(), "sounds/rain.wav".to_owned()),
-                ("third".to_owned(), String::new()),
-            ])
-        );
-        assert_eq!(resolve(&image, &refs, &added, "third"), None);
-        assert_eq!(
-            unknown(&added, "third"),
-            "is an added sound that found no slot in this game version"
-        );
-        assert_eq!(
-            unknown(&added, "fourth"),
-            "is not a sound this mod set adds (see \"sounds\")"
-        );
-        let chime = &overrides["sounds/cry.wav"];
-        assert!(chime.owner == "b" && chime.source.ends_with("other.wav"));
-        assert_eq!(resolve(&image, &refs, &added, "second"), Some(0x70));
+        assert_eq!(resolve(&image, &refs, &added, "chime"), Some(0x8000));
         assert_eq!(
             resolve(&image, &refs, &added, "sounds/pickup.wav"),
             Some(0x3D)
         );
-        let warnings: Vec<&str> = report.warnings().collect();
-        assert_eq!(warnings.len(), 5);
-        assert!(warnings[0].contains("sound name 'Bad Name' must be"));
-        assert!(warnings[3].contains("is defined by a and b; b wins"));
-        assert!(
-            warnings[4].starts_with("b: no unused sound slot left for 'third' (this build has 2)")
+        added.playable = false;
+        assert_eq!(resolve(&image, &refs, &added, "chime"), None);
+        assert_eq!(
+            unknown(&added, "chime"),
+            "is an added sound, and this game version cannot play added sounds"
+        );
+        assert_eq!(
+            unknown(&added, "other"),
+            "is not a sound this mod set adds (see \"sounds\")"
         );
     }
 }

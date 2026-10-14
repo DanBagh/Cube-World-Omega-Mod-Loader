@@ -28,4 +28,4 @@ mod testing;
 pub use error::{Error, Result};
 
 /// Manifest feature level this loader implements. Mods ask for a minimum with `"loader"`.
-pub const LOADER_VERSION: &str = "0.7.0";
+pub const LOADER_VERSION: &str = "0.8.0";

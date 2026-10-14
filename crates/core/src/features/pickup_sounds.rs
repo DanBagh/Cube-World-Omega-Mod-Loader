@@ -396,7 +396,12 @@ mod tests {
                 continue;
             };
             let entries = [entry(43, None, "sounds/cry.wav", "a")];
-            let planned = plan(&mut module, &entries, &Added::new(), &mut Report::default());
+            let planned = plan(
+                &mut module,
+                &entries,
+                &Added::default(),
+                &mut Report::default(),
+            );
             assert_eq!(planned, 1);
             let Op::Hook { blob_offset, .. } = &module.plan.groups[0].ops[1] else {
                 panic!("the hook comes last")
@@ -415,7 +420,10 @@ mod tests {
         );
         let refs = RefIndex::build(&image).unwrap();
         let mut module = module(&image, &refs);
-        let added = Added::from([("chime".to_owned(), "sounds/cry.wav".to_owned())]);
+        let added = Added {
+            ids: [("chime".to_owned(), 0x6B)].into(),
+            playable: true,
+        };
         let entries = [
             entry(95, Some(40), "chime", "a"),
             entry(43, None, "sounds/pickup.wav", "b"),

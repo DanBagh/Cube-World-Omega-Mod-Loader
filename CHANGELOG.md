@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Mods can add new sounds to the game, up to 32 in all, instead of taking one
+  of the game's own sound slots. Mods that use this need
+  `"loader": ">=0.8.0"`.
+
 ## [0.1.1] - 2026-10-14
 
 ### Added

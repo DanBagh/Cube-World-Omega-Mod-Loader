@@ -9,6 +9,7 @@
 //! finds that code by its shape, and is skipped with a line in the report when a build
 //! does not have it. Their trampolines are in `asm/`.
 
+pub mod added_sounds;
 pub mod files;
 pub mod glow;
 pub mod ground_models;
@@ -176,13 +177,7 @@ pub fn build(
         let refs = RefIndex::build(&image)?;
         clients.push((backend, image, refs));
     }
-    // slots are given out once, from the first client, so both serve the same files
-    let added = match clients.first() {
-        Some((_, image, refs)) => {
-            sounds::add(game, mods, &order, image, refs, &mut overrides, &mut report)
-        }
-        None => sounds::Added::new(),
-    };
+    let added = added_sounds::collect(mods, &order, &mut overrides, &mut report);
 
     let note = start_screen::note(order.len(), profile);
     let mut modules = Vec::new();
@@ -208,7 +203,14 @@ pub fn build(
         tally("text patch(es)", planned, texts.len());
         let planned = tooltips::plan(&mut module, &lines, &mut report);
         tally("tooltip line(s)", planned, lines.len());
-        let planned = pickup_sounds::plan(&mut module, &pickups, &added, &mut report);
+        let playable = added_sounds::plan(&mut module, &added, &mut report);
+        tally(
+            "added sound(s)",
+            if playable { added.len() } else { 0 },
+            added.len(),
+        );
+        let named = added_sounds::names(&added, playable);
+        let planned = pickup_sounds::plan(&mut module, &pickups, &named, &mut report);
         tally("pickup sound(s)", planned, pickups.len());
         let installed = item_models::plan(&mut module, &glows, &ground, &mut report);
         tally(
@@ -218,7 +220,7 @@ pub fn build(
         );
         let planned = ground_models::plan(&mut module, &ground, &mut report);
         tally("model(s) by amount", planned, ground.len());
-        let planned = sound_pitch::plan(&mut module, &pitches, &added, &mut report);
+        let planned = sound_pitch::plan(&mut module, &pitches, &named, &mut report);
         tally("sound pitch(es)", planned, pitches.len());
         start_screen::plan(&mut module, &note, &mut report);
         module.plan.finalize();
@@ -250,7 +252,10 @@ mod tests {
     use std::{env, fs};
 
     use super::stub::Stub;
-    use super::{ground_models, item_models, pickup_sounds, sound_pitch, start_screen, tooltips};
+    use super::{
+        added_sounds, ground_models, item_models, pickup_sounds, sound_pitch, start_screen,
+        tooltips,
+    };
 
     /// The assembler of the MSVC build tools: the one `ML64` names, or the newest installed.
     fn ml64() -> Option<PathBuf> {
@@ -309,6 +314,8 @@ mod tests {
             ("item_model", item_models::STUB),
             ("ground_model", ground_models::STUB),
             ("start_screen", start_screen::STUB),
+            ("sound_load", added_sounds::LOAD),
+            ("sound_play", added_sounds::PLAY),
         ] {
             let object = out.path().join(format!("{name}.obj"));
             let done = Command::new(&ml64)

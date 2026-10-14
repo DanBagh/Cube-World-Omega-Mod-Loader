@@ -284,7 +284,10 @@ mod tests {
             pitch("sounds/nope.wav", 1.0, 1.0, "b"),
         ];
         let mut report = Report::default();
-        assert_eq!(plan(&mut module, &pitches, &Added::new(), &mut report), 1);
+        assert_eq!(
+            plan(&mut module, &pitches, &Added::default(), &mut report),
+            1
+        );
 
         let plan = &module.plan;
         let group = &plan.groups[0];

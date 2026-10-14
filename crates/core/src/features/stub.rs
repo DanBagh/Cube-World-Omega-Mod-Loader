@@ -79,6 +79,14 @@ impl Stub {
         self.places(marker)[0] as u32
     }
 
+    /// Offsets of every placeholder made of `marker`.
+    pub fn all(&self, marker: u8) -> Vec<u32> {
+        self.places(marker)
+            .into_iter()
+            .map(|at| at as u32)
+            .collect()
+    }
+
     fn places(&self, marker: u8) -> Vec<usize> {
         let (mut found, mut at) = (Vec::new(), 0);
         while at + 4 <= self.template.len() {
