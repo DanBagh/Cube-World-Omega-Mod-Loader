@@ -78,7 +78,7 @@ pub fn contents(found: &Mod) -> Contents {
                 .object("soundPitch")
                 .map_or(0, |pitches| pitches.len()),
         ),
-        ("glow", found.list("glow").len()),
+        ("glow", glow::count(found)),
         ("groundModels", found.list("groundModels").len()),
     ];
     let present = |key: &&str| found.manifest.get(*key).is_some_and(|v| !v.is_null());
@@ -131,7 +131,7 @@ pub fn build(game: &Game, mods: &mut [Mod], work_dir: &Path) -> Result<Build> {
     let texts = text::collect(mods, &order, &mut report);
     let lines = tooltips::collect(mods, &order, &mut report);
     let pickups = pickup_sounds::collect(mods, &order, &mut report);
-    let glows = glow::collect(mods, &order, &mut report);
+    let mut glows = glow::collect(mods, &order, &mut report);
     let pitches = sound_pitch::collect(mods, &order, &mut report);
     let converted = work_dir.join(CONVERTED_DIR);
     let mut overrides = files::collect(game, mods, &order, &converted, &mut report);
@@ -146,14 +146,10 @@ pub fn build(game: &Game, mods: &mut [Mod], work_dir: &Path) -> Result<Build> {
             },
         );
     }
-    for entry in &glows {
-        let fits = |m: &ground_models::GroundModel| {
-            (m.item_type, Some(m.amount)) == (entry.item_type, entry.amount)
-        };
-        if let Some(amount) = entry.amount.filter(|_| !ground.iter().any(fits)) {
-            report.warn(format!("{}: glow for {amount} or more of item type {}: no groundModels entry has that amount, so it never applies", entry.owner, entry.item_type));
-        }
-    }
+    // each ground model has an entry, so the one for the item's own model never lights it
+    glows.extend(ground.iter().map(|model| model.glow.clone()));
+    glow::in_lookup_order(&mut glows);
+    let glowing = glows.iter().filter(|glow| !glow.mask.is_empty()).count();
 
     for &index in &order {
         let found = &mods[index];
@@ -209,9 +205,9 @@ pub fn build(game: &Game, mods: &mut [Mod], work_dir: &Path) -> Result<Build> {
         tally("pickup sound(s)", planned, pickups.len());
         let installed = item_models::plan(&mut module, &glows, &ground, &mut report);
         tally(
-            "glowing item(s)",
-            if installed { glows.len() } else { 0 },
-            glows.len(),
+            "glowing model(s)",
+            if installed { glowing } else { 0 },
+            glowing,
         );
         let planned = ground_models::plan(&mut module, &ground, &mut report);
         tally("model(s) by amount", planned, ground.len());

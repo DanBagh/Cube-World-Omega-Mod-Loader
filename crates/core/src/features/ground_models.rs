@@ -7,6 +7,10 @@
 //! "this many or more". `item_models` loads the entry's file for that subtype, and the
 //! in-game loader serves the file under a name of its own.
 //!
+//! Each model glows by itself, as its entry's `"glow"` says (see `glow`): `true` for the
+//! whole model, a list of colours, or with none the voxels of its `.vox` that have the
+//! Emit material. It does not take the glow of the item's own model.
+//!
 //! Build-specific: the call is found from the code that compares ground records. The two
 //! clients keep the record in different registers, so the signatures name none.
 
@@ -17,6 +21,7 @@ use serde_json::Value;
 
 use super::ModuleBuild;
 use super::files::{content_hash, usable_model};
+use super::glow::{self, Glow};
 use super::stub::{ANY, CLIENT, RETURN, Stub, i32_at, signature};
 use crate::mods::{Mod, Notice};
 use crate::plan::{BLOB_PAD, Claim, Group, Op};
@@ -53,6 +58,8 @@ pub struct GroundModel {
     /// The game path it is served under.
     pub name: String,
     pub owner: String,
+    /// Its glowing voxels, none for a model that does not glow.
+    pub glow: Glow,
 }
 
 impl GroundModel {
@@ -94,14 +101,15 @@ pub fn collect(
     for &index in order {
         for patch in mods[index].list("groundModels").to_vec() {
             let found = &mut mods[index];
+            let ignored = |reason: String| {
+                Notice::new("Ground model ignored")
+                    .with("Entry", one_line(&patch.to_string(), 70))
+                    .with("Reason", reason)
+            };
             let (item_type, amount, relative, path) = match parse(found, &patch) {
                 Ok(entry) => entry,
                 Err(reason) => {
-                    found.warnings.push(
-                        Notice::new("Ground model ignored")
-                            .with("Entry", one_line(&patch.to_string(), 70))
-                            .with("Reason", reason),
-                    );
+                    found.warnings.push(ignored(reason));
                     continue;
                 }
             };
@@ -118,12 +126,28 @@ pub fn collect(
                     continue;
                 }
             };
+            let entry = patch
+                .as_object()
+                .expect("parse took the entry as an object");
+            let (glow, count, how) =
+                match glow::of_ground_model(entry, &path, (item_type, amount), &id) {
+                    Ok(lit) => lit,
+                    Err(reason) => {
+                        found.warnings.push(ignored(reason));
+                        continue;
+                    }
+                };
+            if count > 0 {
+                let [x, y, z] = glow.size;
+                report.say(format!("Glow: item type {item_type} ({amount} or more) ({id}): {count} voxel(s) of a {x}x{y}x{z} model, chosen by {how}"));
+            }
             let model = GroundModel {
                 item_type,
                 amount,
                 file,
                 name: format!("sprites/cwo-ground-{}.cub", content_hash(&data)),
                 owner: id.clone(),
+                glow,
             };
             match chosen
                 .iter_mut()
@@ -277,7 +301,76 @@ pub(crate) mod tests {
             file: PathBuf::from("model.cub"),
             name: format!("sprites/cwo-ground-{amount:016x}.cub"),
             owner: owner.into(),
+            glow: Glow {
+                item_type,
+                subtype: Some(SUBTYPE | u32::from(amount)),
+                amount: Some(amount),
+                size: [14, 6, 24],
+                mask: Vec::new(),
+                owner: owner.into(),
+            },
         }
+    }
+
+    #[test]
+    fn each_model_glows_by_its_own_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = write_mod(
+            dir.path(),
+            "m",
+            r##"{"schema": 1, "id": "m", "version": "1.0.0", "groundModels": [
+                {"type": 43, "amount": 5, "model": "lit.vox"},
+                {"type": 43, "amount": 20, "model": "coin.cub", "glow": ["#0a141e"]},
+                {"type": 43, "amount": 50, "model": "lit.vox", "glow": true},
+                {"type": 43, "amount": 100, "model": "coin.cub"},
+                {"type": 43, "amount": 300, "model": "coin.cub", "glow": ["#123456"]},
+                {"type": 43, "amount": 400, "model": "coin.cub", "glow": "yes"},
+                {"type": 43, "amount": 500, "model": "lit.vox", "glow": false}]}"##,
+        );
+        fs::write(folder.join("coin.cub"), sample().to_cub()).unwrap();
+        fs::write(
+            folder.join("lit.vox"),
+            crate::features::glow::tests::emitting_vox(),
+        )
+        .unwrap();
+        let mut mods = load(dir.path());
+        let order = resolve(&mut mods, "gh-1");
+        let mut report = Report::default();
+        let models = collect(
+            &mut mods,
+            &order,
+            &dir.path().join("converted"),
+            &mut report,
+        );
+
+        let masks: Vec<(u16, u32, &[u8])> = models
+            .iter()
+            .map(|m| (m.amount, m.glow.subtype.unwrap(), &m.glow.mask[..]))
+            .collect();
+        // the sample: cells 0 and 1 are one colour, cell 5 (x 1, z 2) another, with Emit
+        assert_eq!(
+            masks,
+            [
+                (500, SUBTYPE | 500, &[][..]),
+                (100, SUBTYPE | 100, &[][..]),
+                (50, SUBTYPE | 50, &[0b10_0011, 0, 0, 0, 0, 0, 0, 0][..]),
+                (20, SUBTYPE | 20, &[0b11, 0, 0, 0, 0, 0, 0, 0][..]),
+                (5, SUBTYPE | 5, &[0b10_0000, 0, 0, 0, 0, 0, 0, 0][..]),
+            ]
+        );
+        assert_eq!(crate::features::glow::count(&mods[0]), 3);
+        let reasons: Vec<&str> = mods[0]
+            .warnings
+            .iter()
+            .map(|notice| notice.details[1].1.as_str())
+            .collect();
+        assert_eq!(
+            reasons,
+            [
+                "no voxel has the colour #123456",
+                r##"glow must be true or a list like ["#4fe74d"]"##
+            ]
+        );
     }
 
     #[test]

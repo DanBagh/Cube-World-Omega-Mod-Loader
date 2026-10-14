@@ -172,7 +172,7 @@ pub fn plan(
         id: GROUP.into(),
         label: format!(
             "{} glowing model(s), {} model file(s) by amount [{}]",
-            glows.len(),
+            glows.iter().filter(|glow| !glow.mask.is_empty()).count(),
             models.len(),
             who.join("+")
         ),
