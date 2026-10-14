@@ -12,6 +12,10 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of the game's own sound slots. Mods that use this need
   `"loader": ">=0.8.0"`.
 
+### Changed
+
+- The Rupees example plays its own pickup sound again, as an added sound.
+
 ## [0.1.1] - 2026-10-14
 
 ### Added
