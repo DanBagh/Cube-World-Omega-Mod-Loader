@@ -17,7 +17,7 @@ use crate::pe::PeImage;
 use crate::refs::{RefIndex, SiteKind, string_sites};
 use crate::report::Report;
 
-/// Name of an added sound to the game path of the slot it took.
+/// Name of an added sound to the game path of the slot it took, empty when it found none.
 pub type Added = BTreeMap<String, String>;
 
 /// The id the client loads a sound file under: `lea reg, [path]` ... `mov dx, <id>`.
@@ -138,6 +138,8 @@ pub fn add(
                 "{}: no unused sound slot left for '{name}' (this build has {slots}); skipped",
                 sound.owner
             ));
+            // known, with nowhere to go: see `unknown`
+            added.insert(name, String::new());
             continue;
         };
         report.say(format!(
@@ -156,9 +158,11 @@ pub fn resolve(image: &PeImage, refs: &RefIndex, added: &Added, sound: &str) -> 
 }
 
 /// Why `resolve` found nothing, for a report line.
-pub fn unknown(sound: &str) -> &'static str {
+pub fn unknown(added: &Added, sound: &str) -> &'static str {
     if sound.contains('/') {
         "is not a sound the game loads"
+    } else if added.contains_key(sound) {
+        "is an added sound that found no slot in this game version"
     } else {
         "is not a sound this mod set adds (see \"sounds\")"
     }
@@ -253,13 +257,24 @@ pub(crate) mod tests {
             &mut report,
         );
 
-        // the lower id first, in the order the names were first seen. b's chime replaced a's
+        // the lower id first, in the order the names were first seen. b's chime replaced a's,
+        // and the third found no slot
         assert_eq!(
             added,
             Added::from([
                 ("chime".to_owned(), "sounds/cry.wav".to_owned()),
                 ("second".to_owned(), "sounds/rain.wav".to_owned()),
+                ("third".to_owned(), String::new()),
             ])
+        );
+        assert_eq!(resolve(&image, &refs, &added, "third"), None);
+        assert_eq!(
+            unknown(&added, "third"),
+            "is an added sound that found no slot in this game version"
+        );
+        assert_eq!(
+            unknown(&added, "fourth"),
+            "is not a sound this mod set adds (see \"sounds\")"
         );
         let chime = &overrides["sounds/cry.wav"];
         assert!(chime.owner == "b" && chime.source.ends_with("other.wav"));

@@ -149,7 +149,7 @@ pub fn plan(
                 "{backend}: {}: soundPitch: '{}' {}; entry skipped",
                 pitch.owner,
                 pitch.sound,
-                sounds::unknown(&pitch.sound)
+                sounds::unknown(added, &pitch.sound)
             ));
             continue;
         };

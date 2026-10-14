@@ -196,7 +196,7 @@ pub fn plan(
                 "{backend}: {}: '{}' {}; entry skipped",
                 entry.owner,
                 entry.sound,
-                sounds::unknown(&entry.sound)
+                sounds::unknown(added, &entry.sound)
             ));
             continue;
         };
