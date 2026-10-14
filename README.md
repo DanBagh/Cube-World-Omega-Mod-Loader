@@ -1,9 +1,9 @@
-# Cube World Omega Mod Launcher (CWOML)
+# Cube World Omega Mod Loader (CWOML)
 
-A launcher and mod manager for Cube World Omega.
+A mod manager for Cube World Omega.
 
-> [!WARNING]
-> Currently a scaffold. It opens a window and nothing game related works yet.
+> [!INFO]
+> This loader only applies a collection of mods to the game. You still start the game from the Wollay Launcher itself.
 
 Goals:
 
@@ -63,6 +63,9 @@ The backend is a Cargo workspace:
 - `crates/core/` is the mod loader as a library, with no Tauri in it: finding
   the game, reading and ordering mods, analysing the client DLLs and planning
   the patches. Each kind of mod content is one module in `src/features/`.
+- `crates/loader/` is the DLL that runs inside the game. It applies the plan
+  the library writes and does nothing else. The library's build script builds
+  it and embeds it, so the launcher stays one file.
 - `crates/cli/` is a small command line tool over the library, for trying
   things without the app:
   `cargo run -p cwoml-cli -- plan --mods <folder> --out <folder>`
@@ -71,8 +74,15 @@ The backend is a Cargo workspace:
 Functions marked `#[tauri::command]` in `src-tauri/src/lib.rs` are what the
 frontend can call with `invoke`.
 
-The tests in `crates/core` run without the game:
-`cargo test -p cwoml-core`
+The tests run without the game:
+`cargo test -p cwoml-core -p cwoml-loader`
+
+Some features put a little machine code of their own into the game. Its source
+is in `crates/core/src/features/asm/`, and the assembled bytes are in the Rust
+file of the feature. After changing an `.asm`, this assembles them all and
+compares, printing the new bytes of any that differ. It needs `ml64` from the
+MSVC build tools:
+`cargo test -p cwoml-core -- --ignored trampolines`
 
 ## Before committing
 
@@ -120,6 +130,35 @@ or the file named by `"icon"` in `mod.json` (png, jpg or webp, up to 512 KB).
 Profiles are in `cwoml-data/profiles.json`. A profile lists the mods added to
 it, which of them are on, and their order. A new profile starts empty or as a
 copy of another one.
+
+## Applying a profile
+
+Apply makes the game start with the mods of the current profile. It works out
+their patches, writes them to `cwoml-data/plan.txt` and puts the loader into
+the game folder. It does not start the game. Game must be started from the Wollay
+Launcher itself.
+
+Two files are put into the game folder, beside `cubeworld.exe`:
+`dbghelp.dll`, which is the loader, and `cwoml.txt`, which tells it where
+`cwoml-data` is. None of the game's own files are changed. Disable mods takes
+both out again, and the game starts plain. Enable mods puts them back with
+the current profile. A `dbghelp.dll` that is not the loader is never replaced
+or removed.
+
+The loader goes by that name because `cubeworld.exe` asks for `dbghelp.dll`
+itself, so Windows always finds the one beside it. It hands every call on to
+the real one in the Windows folder.
+
+What was applied is noted in `profiles.json`. The mod list is grayed out
+while the mods are off or the game has another profile, and a line above it
+says when the profile has changed since it was applied.
+
+A game update installs into a new folder without the loader, so the mods
+show as off. Enable them again after one.
+
+When the game starts, the loader writes what it did to
+`cwoml-data/loader.log`. A patch whose place in the game no longer looks the
+way the plan expects is skipped and named there.
 
 ## License
 
