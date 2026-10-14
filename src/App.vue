@@ -297,7 +297,7 @@ const status = computed(() => {
         : "Not applied. The game has other mods."
     case "changed":
       // unsaved changes come first, and Save is already offered for them
-      return dirty.value ? "" : "Out of date in the game. Apply to update it."
+      return dirty.value ? "" : "Press Apply to update the mods."
     default:
       return ""
   }
