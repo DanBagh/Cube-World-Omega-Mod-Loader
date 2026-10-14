@@ -10,6 +10,8 @@ use crate::{Error, Result};
 
 pub const GAME_EXE: &str = "cubeworld.exe";
 pub const DEFAULT_CHANNEL: &str = "beta";
+/// Beside the game since its version 0.1.0: the version number it shows players.
+const VERSION_FILE: &str = "game-version.txt";
 
 /// The client ships once per CPU level. `cubeworld.exe` picks one at startup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -41,6 +43,8 @@ pub struct Game {
     pub root: PathBuf,
     /// Release name from `source.json`, or "unknown".
     pub release: String,
+    /// The version number the game shows, such as 0.1.1. Releases before 0.1.0 have none.
+    pub version: Option<String>,
     pub commit: String,
     /// Installed and updated by the official launcher, as opposed to a folder the user chose.
     pub managed: bool,
@@ -48,6 +52,11 @@ pub struct Game {
 }
 
 impl Game {
+    /// How the game is named to players: its version number, else its release.
+    pub fn shown(&self) -> &str {
+        self.version.as_deref().unwrap_or(&self.release)
+    }
+
     /// The client DLL the game runs on this PC: the avx2 one where the processor has
     /// AVX2, which is taken to be the game's own rule when it is left to choose.
     pub fn client(&self) -> Option<Backend> {
@@ -135,8 +144,18 @@ pub fn find(game_dir: Option<&Path>, channel: &str) -> Result<Game> {
             root.display()
         )));
     }
+    let version = fs::read_to_string(root.join(VERSION_FILE))
+        .ok()
+        .and_then(|text| text.lines().next().map(|line| line.trim().to_owned()))
+        .filter(|version| {
+            (1..=32).contains(&version.len())
+                && version
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || ".-+".contains(c))
+        });
     Ok(Game {
         release: field("release").unwrap_or_else(|| "unknown".into()),
+        version,
         commit: field("gitCommit").unwrap_or_default(),
         managed: game_dir.is_none(),
         modules,
@@ -171,6 +190,15 @@ mod tests {
         assert_eq!(
             (game.release.as_str(), game.commit.as_str(), game.managed),
             ("gh-1", "abc", false)
+        );
+        assert_eq!((game.version.as_deref(), game.shown()), (None, "gh-1"));
+        fs::write(dir.path().join(VERSION_FILE), "0.1.1\r\n").unwrap();
+        let game = find(Some(dir.path()), DEFAULT_CHANNEL).unwrap();
+        assert_eq!(game.shown(), "0.1.1");
+        fs::write(dir.path().join(VERSION_FILE), "not a version").unwrap();
+        assert_eq!(
+            find(Some(dir.path()), DEFAULT_CHANNEL).unwrap().version,
+            None
         );
         assert_eq!(
             game.modules.keys().copied().collect::<Vec<_>>(),

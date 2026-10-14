@@ -6,7 +6,40 @@ use serde_json::Value;
 
 use super::{Mod, Notice};
 use crate::LOADER_VERSION;
+use crate::game::Game;
 use crate::version::Version;
+
+/// The installed game as a mod's `game.releases` can name it: by release, or by the
+/// version number the game has shown since 0.1.0.
+#[derive(Debug, Clone, Copy)]
+pub struct Installed<'a> {
+    pub release: &'a str,
+    pub version: Option<&'a str>,
+}
+
+impl<'a> From<&'a str> for Installed<'a> {
+    fn from(release: &'a str) -> Self {
+        Installed {
+            release,
+            version: None,
+        }
+    }
+}
+
+impl<'a> From<&'a Game> for Installed<'a> {
+    fn from(game: &'a Game) -> Self {
+        Installed {
+            release: &game.release,
+            version: game.version.as_deref(),
+        }
+    }
+}
+
+impl Installed<'_> {
+    fn named(&self, name: &str) -> bool {
+        name == "*" || name == self.release || Some(name) == self.version
+    }
+}
 
 fn names(value: Option<&Value>) -> Vec<String> {
     value
@@ -39,7 +72,8 @@ fn place(found: &Mod) -> (usize, i64, String) {
 /// first, then the rank the user's profile gives, then ascending priority, then id.
 /// Later mods win conflicts between patches. Mods that drop out get the reason added to
 /// their `errors`. Mods the profile turned off are left alone.
-pub fn resolve(mods: &mut [Mod], game_release: &str) -> Vec<usize> {
+pub fn resolve<'a>(mods: &mut [Mod], installed: impl Into<Installed<'a>>) -> Vec<usize> {
+    let installed = installed.into();
     let loader = Version::parse(LOADER_VERSION).expect("loader version");
     for found in mods.iter_mut().filter(|m| m.active()) {
         if let Some(spec) = found.manifest.get("loader").filter(|v| !v.is_null()) {
@@ -57,10 +91,14 @@ pub fn resolve(mods: &mut [Mod], game_release: &str) -> Vec<usize> {
         }
         let target = found.object("game");
         let releases = names(target.and_then(|t| t.get("releases")));
-        if !releases.is_empty() && !releases.iter().any(|r| r == "*" || r == game_release) {
+        if !releases.is_empty() && !releases.iter().any(|name| installed.named(name)) {
+            let shown = match installed.version {
+                Some(version) => format!("{version} ({})", installed.release),
+                None => installed.release.to_owned(),
+            };
             let notice = Notice::new("Game version mismatch")
                 .with("Mod", releases.join(", "))
-                .with("Installed", game_release);
+                .with("Installed", shown);
             // a strict mod does not load on another release. Others load what still fits
             if target
                 .and_then(|t| t.get("strict"))
@@ -259,9 +297,28 @@ mod tests {
         );
         let mismatch = "Game version mismatch (Mod gh-0, Installed gh-1)";
         assert_eq!(errors(&mods, "strict"), [mismatch]);
+
         let loose = mods.iter().find(|m| m.id == "loose").unwrap();
         assert_eq!(loose.warnings.len(), 1);
         assert_eq!(loose.warnings[0].to_string(), mismatch);
+    }
+
+    #[test]
+    fn a_release_can_be_named_by_its_version() {
+        let (_dir, mut mods) = load_all(&[
+            r#"{"schema": 1, "id": "by-version", "version": "1.0.0", "game": {"releases": ["0.1.1"], "strict": true}}"#,
+            r#"{"schema": 1, "id": "older", "version": "1.0.0", "game": {"releases": ["0.1.0"], "strict": true}}"#,
+        ]);
+        let installed = Installed {
+            release: "gh-2",
+            version: Some("0.1.1"),
+        };
+        let order = resolve(&mut mods, installed);
+        assert_eq!(ids(&mods, &order), ["by-version"]);
+        assert_eq!(
+            errors(&mods, "older"),
+            ["Game version mismatch (Mod 0.1.0, Installed 0.1.1 (gh-2))"]
+        );
     }
 
     #[test]

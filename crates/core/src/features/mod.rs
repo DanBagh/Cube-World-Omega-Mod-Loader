@@ -127,7 +127,7 @@ pub struct Build {
 /// report holds the rest.
 pub fn build(game: &Game, mods: &mut [Mod], work_dir: &Path) -> Result<Build> {
     let mut report = Report::default();
-    let order = mods::resolve(mods, &game.release);
+    let order = mods::resolve(mods, game);
     let texts = text::collect(mods, &order, &mut report);
     let lines = tooltips::collect(mods, &order, &mut report);
     let pickups = pickup_sounds::collect(mods, &order, &mut report);

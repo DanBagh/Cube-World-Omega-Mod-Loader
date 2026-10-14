@@ -37,8 +37,8 @@ const emit = defineEmits<{ close: []; launcher: [] }>()
           The game will now start with this profile's mods. You still need to
           start the game from the Wollay Launcher.
         </DialogDescription>
-        <p class="mt-1 text-xs text-muted">
-          Game version {{ applied.release }}
+        <p class="mt-1 text-xs text-muted" :title="applied.release">
+          Game version {{ applied.version ?? applied.release }}
         </p>
 
         <ul

@@ -217,6 +217,7 @@ pub(crate) mod tests {
         let game = Game {
             root,
             release: "gh-1".into(),
+            version: None,
             commit: String::new(),
             managed: false,
             modules: BTreeMap::from([(Backend::Avx2, dir.path().join("client.dll"))]),

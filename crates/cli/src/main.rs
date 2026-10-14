@@ -53,7 +53,14 @@ fn parse(mut raw: impl Iterator<Item = String>) -> Result<Args, String> {
 }
 
 fn print_game(game: &Game) {
-    println!("Game release {} at {}", game.release, game.root.display());
+    match &game.version {
+        Some(version) => println!(
+            "Game {version} (release {}) at {}",
+            game.release,
+            game.root.display()
+        ),
+        None => println!("Game release {} at {}", game.release, game.root.display()),
+    }
     for (backend, path) in &game.modules {
         println!("  {:<9} {}", backend.key(), path.display());
     }
@@ -141,7 +148,7 @@ fn run(args: Args) -> Result<(), String> {
     print_game(&game);
     match args.command.as_str() {
         "status" => {
-            let order = mods::resolve(&mut mods, &game.release);
+            let order = mods::resolve(&mut mods, &game);
             print_mods(&mods, &order);
         }
         "plan" => {

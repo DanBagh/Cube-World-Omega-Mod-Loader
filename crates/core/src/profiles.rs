@@ -75,8 +75,8 @@ pub fn apply(mods: &mut [Mod], entries: &[Entry]) {
 }
 
 /// `mods` as entries: everything that can load turned on, in the loader's own order.
-pub fn entries_for(mods: &mut [Mod], game_release: &str) -> Vec<Entry> {
-    let order = mods::resolve(mods, game_release);
+pub fn entries_for<'a>(mods: &mut [Mod], installed: impl Into<mods::Installed<'a>>) -> Vec<Entry> {
+    let order = mods::resolve(mods, installed);
     let entry = |found: &Mod, enabled| Entry {
         id: found.id.clone(),
         enabled,

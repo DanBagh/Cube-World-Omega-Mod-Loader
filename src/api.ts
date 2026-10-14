@@ -9,6 +9,8 @@ export interface AppInfo {
 
 export interface GameStatus {
   root: string
+  // the version number the game shows, null before game 0.1.0
+  version: string | null
   release: string
   backends: string[]
 }
@@ -111,6 +113,7 @@ export interface ModNote {
 export interface Applied {
   // the profile whose mods the game now starts with
   profile: string
+  version: string | null
   release: string
   notes: ModNote[]
   // what a mod asked for that could not be done on the game client this PC runs

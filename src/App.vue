@@ -526,9 +526,13 @@ onUnmounted(() => stopListening())
         Currently Running:
         {{ standing === "off" ? "no mods" : (given ?? "other mods") }}
       </span>
-      <span class="ml-auto truncate">
+      <span class="ml-auto truncate" :title="game?.release">
         Cube World Omega
-        {{ game ? game.release : gameError || "Looking for the game" }}
+        {{
+          game
+            ? (game.version ?? game.release)
+            : gameError || "Looking for the game"
+        }}
       </span>
     </footer>
 

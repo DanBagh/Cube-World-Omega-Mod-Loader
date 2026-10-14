@@ -194,6 +194,7 @@ mod tests {
         let game = Game {
             root,
             release: "gh-1".into(),
+            version: None,
             commit: String::new(),
             managed: false,
             modules: BTreeMap::new(),

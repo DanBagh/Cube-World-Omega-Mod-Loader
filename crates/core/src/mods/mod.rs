@@ -13,7 +13,7 @@ use crate::version::Version;
 
 pub use install::{Imported, Inspected, import_zip, inspect_zip, remove};
 pub use notice::Notice;
-pub use resolve::resolve;
+pub use resolve::{Installed, resolve};
 
 pub const MANIFEST_NAME: &str = "mod.json";
 pub const MANIFEST_SCHEMA: i64 = 1;

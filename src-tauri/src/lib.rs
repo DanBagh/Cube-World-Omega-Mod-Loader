@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use cwoml_core::features;
-use cwoml_core::game::{self, DEFAULT_CHANNEL};
+use cwoml_core::game::{self, DEFAULT_CHANNEL, Game};
 use cwoml_core::loader;
 use cwoml_core::mods::{self, Mod, Notice};
 use cwoml_core::profiles::{self, Entry, InGame, PROFILES_NAME, Profiles};
@@ -41,6 +41,8 @@ struct AppInfo {
 #[derive(Serialize)]
 struct GameStatus {
     root: String,
+    /// The version number the game shows, None before game 0.1.0.
+    version: Option<String>,
     release: String,
     backends: Vec<&'static str>,
 }
@@ -142,6 +144,7 @@ struct ModNote {
 struct Applied {
     /// The profile whose mods the game now starts with.
     profile: String,
+    version: Option<String>,
     release: String,
     notes: Vec<ModNote>,
     /// What a mod asked for that could not be done on the client this PC runs.
@@ -168,14 +171,21 @@ fn game_status() -> Result<GameStatus, String> {
     let game = game::find(None, DEFAULT_CHANNEL).map_err(|e| e.to_string())?;
     Ok(GameStatus {
         root: game.root.display().to_string(),
+        version: game.version.clone(),
         release: game.release,
         backends: game.modules.keys().map(|backend| backend.key()).collect(),
     })
 }
 
-// a mod made for another release still loads unless it says strict, so "unknown" is safe
-fn release() -> String {
-    game::find(None, DEFAULT_CHANNEL).map_or_else(|_| "unknown".to_owned(), |game| game.release)
+/// The installed game, which mods are judged against.
+fn installed() -> Option<Game> {
+    game::find(None, DEFAULT_CHANNEL).ok()
+}
+
+/// What the mods are judged against without a game. A mod made for another release still
+/// loads unless it says strict, so "unknown" is safe.
+fn judged(game: Option<&Game>) -> mods::Installed<'_> {
+    game.map_or("unknown".into(), Into::into)
 }
 
 fn icon(found: &Mod) -> Option<String> {
@@ -225,7 +235,8 @@ fn view(found: &Mod, order: Option<usize>) -> ModView {
 fn evaluate(mods_dir: &Path, entries: &[Entry]) -> Vec<ModView> {
     let mut found = mods::load(mods_dir);
     profiles::apply(&mut found, entries);
-    let order = mods::resolve(&mut found, &release());
+    let game = installed();
+    let order = mods::resolve(&mut found, judged(game.as_ref()));
     let mut listed: Vec<usize> = (0..found.len())
         .filter(|&index| entries.iter().any(|entry| entry.id == found[index].id))
         .collect();
@@ -243,7 +254,8 @@ fn read_profiles(paths: &Paths) -> Result<Profiles, String> {
     let file = paths.profiles();
     let fresh = !file.is_file();
     let profiles = Profiles::load(&file, || {
-        profiles::entries_for(&mut mods::load(&paths.mods()), &release())
+        let game = installed();
+        profiles::entries_for(&mut mods::load(&paths.mods()), judged(game.as_ref()))
     });
     // written at once: from here on a profile only holds the mods added to it
     if fresh {
@@ -459,6 +471,7 @@ fn apply_profile(paths: State<Paths>) -> Result<Applied, String> {
         .collect();
     Ok(Applied {
         profile: name.clone(),
+        version: game.version.clone(),
         release: game.release,
         notes,
         // every such line starts by naming its client, which says nothing to a player
