@@ -20,7 +20,6 @@
 		{ "type": 43, "amount": 100, "model": "assets/rupee-silver.vox" },
 		{ "type": 43, "amount": 300, "model": "assets/rupee-gold.vox" }
 	],
-	"glow": [{ "type": 43, "model": "assets/rupee-green.vox" }],
 	"pickupSounds": [{ "type": 43, "sound": "rupee-get" }],
 	"soundPitch": {
 		"sounds/drop-coin.wav": 1.0

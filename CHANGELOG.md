@@ -16,6 +16,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The Rupees example plays its own pickup sound again, as an added sound.
 
+### Removed
+
+- Glowing voxels: the `glow` section, and `"glow"` in `groundModels` entries.
+  They did not light anything up in the game. Mods that have them still load,
+  without the glow.
+
 ## [0.1.1] - 2026-10-14
 
 ### Added

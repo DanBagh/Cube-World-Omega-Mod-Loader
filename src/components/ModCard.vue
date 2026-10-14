@@ -37,7 +37,6 @@ const groups: [string, Record<string, [string, string]>][] = [
     {
       models: ["model replaced", "models replaced"],
       groundModels: ["model for item piles", "models for item piles"],
-      glow: ["model that glows", "models that glow"],
     },
   ],
   [

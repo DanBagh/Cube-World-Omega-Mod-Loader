@@ -180,7 +180,7 @@ copy of another one.
 `mod.json` can hold:
 
 - `rupees` turns gold coins into rupees: a new model, another model for each
-  size of pile with its own glow, a pickup sound and changed text.
+  size of pile, a pickup sound of its own and changed text.
 - `pet-food-labels` adds a line to the tooltip of every taming food, saying
   which creature it is for.
 
