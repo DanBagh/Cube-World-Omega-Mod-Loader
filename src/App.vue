@@ -14,6 +14,7 @@ import {
 } from "reka-ui"
 import {
   api,
+  newerRelease,
   type Applied,
   type AppInfo,
   type Entry,
@@ -33,6 +34,8 @@ import SortPicker from "./components/SortPicker.vue"
 import { byName, byProblems, useListing, type Sort } from "./listing"
 
 const info = ref<AppInfo>()
+// a newer version of this app, when one is out
+const update = ref<string | null>(null)
 const game = ref<GameStatus>()
 const gameError = ref("")
 
@@ -343,6 +346,11 @@ onMounted(async () => {
     show(await api.profiles())
     await refreshLibrary()
   })
+  // offline, or GitHub not answering, is no reason to bother anyone
+  if (info.value)
+    newerRelease(info.value.version)
+      .then((version) => (update.value = version))
+      .catch(() => {})
   try {
     game.value = await api.gameStatus()
   } catch (reason) {
@@ -521,6 +529,14 @@ onUnmounted(() => stopListening())
       class="flex min-h-8 gap-4 border-t border-line px-4 py-1.5 text-sm text-muted"
     >
       <span v-if="info">CWOML {{ info.version }}</span>
+      <button
+        v-if="update"
+        class="cursor-pointer font-semibold text-accent hover:underline"
+        title="Open the download page"
+        @click="attempt(api.openReleases)"
+      >
+        Version {{ update }} is out
+      </button>
       <span>|</span>
       <span v-if="standing">
         Currently Running:

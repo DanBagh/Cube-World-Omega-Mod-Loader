@@ -148,5 +148,28 @@ export const api = {
   loaderStatus: () => invoke<LoaderStatus>("loader_status"),
   applyProfile: () => invoke<Applied>("apply_profile"),
   openWollayLauncher: () => invoke<void>("open_wollay_launcher"),
+  openReleases: () => invoke<void>("open_releases"),
   removeLoader: () => invoke<boolean>("remove_loader"),
+}
+
+// GitHub's record of the newest published release, without drafts and pre-releases
+const LATEST =
+  "https://api.github.com/repos/DanBagh/Cube-World-Omega-Mod-Loader/releases/latest"
+
+// the version of the newest release when it is newer than `current`, else null
+export async function newerRelease(current: string): Promise<string | null> {
+  const answer = await fetch(LATEST, {
+    headers: { Accept: "application/vnd.github+json" },
+  })
+  if (!answer.ok) return null
+  const { tag_name: tag } = (await answer.json()) as { tag_name?: string }
+  const numbers = (version: string) =>
+    version.replace(/^v/, "").split(".").map(Number)
+  const [latest, running] = [numbers(tag ?? ""), numbers(current)]
+  for (let at = 0; at < 3; at++) {
+    const [a, b] = [latest[at] ?? 0, running[at] ?? 0]
+    // a tag that is not a version compares as neither
+    if (a !== b) return a > b ? (tag ?? "").replace(/^v/, "") : null
+  }
+  return null
 }

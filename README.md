@@ -37,6 +37,9 @@ applied.
 Some antivirus programs may object to the DLL the loader puts into the game
 folder (see [Applying a profile](#applying-a-profile)).
 
+When it starts, the app asks GitHub whether there is a newer release. If
+there is, the footer says so, and clicking that opens the download page.
+
 If something goes wrong, open an [issue](https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/issues) with what the Apply
 dialog said and `cwoml-data/loader.log`, which is written each time the game
 starts.

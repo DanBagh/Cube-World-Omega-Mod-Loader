@@ -15,6 +15,8 @@ const DATA_DIR: &str = "cwoml-data";
 const MODS_DIR: &str = "mods";
 /// A mod icon larger than this is not shown.
 const MAX_ICON: u64 = 512 * 1024;
+/// Where new versions of this app are published.
+const RELEASES: &str = "https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/releases/latest";
 
 struct Paths {
     data: PathBuf,
@@ -509,6 +511,25 @@ fn open_wollay_launcher() -> Result<(), String> {
     loader::open_apart(&exe).map_err(|e| e.to_string())
 }
 
+/// Opens the page of the newest release in the browser.
+#[tauri::command]
+fn open_releases() -> Result<(), String> {
+    let opener = if cfg!(windows) {
+        "explorer.exe"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    let mut child = std::process::Command::new(opener)
+        .arg(RELEASES)
+        .spawn()
+        .map_err(|e| format!("{opener}: {e}"))?;
+    // waited for, so it does not linger once it has handed the page to the browser
+    std::thread::spawn(move || child.wait());
+    Ok(())
+}
+
 /// Takes the loader out of the game folder. False if it was not there.
 #[tauri::command]
 fn remove_loader(paths: State<Paths>) -> Result<bool, String> {
@@ -573,6 +594,7 @@ pub fn run() {
             loader_status,
             apply_profile,
             open_wollay_launcher,
+            open_releases,
             remove_loader
         ])
         .run(tauri::generate_context!())
