@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use crate::{Error, Result};
+use crate::{Error, Result, wine};
 
 pub const GAME_EXE: &str = "cubeworld.exe";
 pub const DEFAULT_CHANNEL: &str = "beta";
@@ -76,10 +76,13 @@ impl Game {
     }
 }
 
-/// Where the official launcher keeps its files, if this OS has a known place for it.
+/// Where the official launcher keeps its files, if it can be found.
 pub fn launcher_dir() -> Option<PathBuf> {
-    // only set on Windows. A Wine or Proton prefix is not looked up yet
-    std::env::var_os("LOCALAPPDATA").map(|dir| PathBuf::from(dir).join("com.wollay.launcher"))
+    if cfg!(windows) {
+        let local = std::env::var_os("LOCALAPPDATA")?;
+        return Some(PathBuf::from(local).join(wine::LAUNCHER_ID));
+    }
+    wine::launcher_dir()
 }
 
 /// The release the official launcher has active on `channel`.

@@ -8,22 +8,17 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
+  prepare:
+    # a draft release with the notes and the example mods, published once every build is on it
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.draft.outputs.id }}
     steps:
       - uses: actions/checkout@v7
         with:
           # the whole history, to tell whether the tag is on main
           fetch-depth: 0
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.11
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: bun install --frozen-lockfile
 
       - name: Check the tag is on main
         run: |
@@ -42,7 +37,6 @@ jobs:
           fi
 
       - name: Release notes from the changelog
-        id: notes
         run: |
           version="${GITHUB_REF_NAME#v}"
           # the section of this version, up to the next one or the links at the end
@@ -55,25 +49,16 @@ jobs:
             echo "::error::CHANGELOG.md has no section for $version"
             exit 1
           fi
-          {
-            echo "body<<END_OF_NOTES"
-            cat notes.md
-            echo "END_OF_NOTES"
-          } >> "$GITHUB_OUTPUT"
 
-      - name: Build and publish
-        uses: tauri-apps/tauri-action@v1
+      - name: Draft the release
+        id: draft
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: CWOML ${{ github.ref_name }}
-          releaseBody: ${{ steps.notes.outputs.body }}
-          # portable: the exe alone, no installer
-          args: --no-bundle
-          uploadPlainBinary: true
-          # the game is 64-bit only, so the architecture is left out
-          releaseAssetNamePattern: CWOML_[version]_[platform][ext]
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
+            -f tag_name="$GITHUB_REF_NAME" -f name="CWOML $GITHUB_REF_NAME" \
+            -F body=@notes.md -F draft=true --jq .id)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
       - name: Attach the example mods
         if: hashFiles('example_mods/*/mod.json') != ''
@@ -84,6 +69,82 @@ jobs:
           for mod in example_mods/*/; do
             name=$(basename "$mod")
             # mod.json at the top of the zip, as the app expects
-            (cd "$mod" && 7z a -tzip "../../mod-zips/$name.zip" . '-x!*.zip' > /dev/null)
+            (cd "$mod" && zip -qr "../../mod-zips/$name.zip" . -x '*.zip')
+            curl -fsS -o /dev/null -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/zip" \
+              --data-binary "@mod-zips/$name.zip" \
+              "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/${{ steps.draft.outputs.id }}/assets?name=$name.zip"
           done
-          gh release upload "$GITHUB_REF_NAME" mod-zips/*.zip --clobber
+
+  loader:
+    # the in-game DLL is built with the MSVC tools, once for every build of the app
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release -p cwoml-loader
+      - uses: actions/upload-artifact@v4
+        with:
+          name: loader
+          path: target/release/cwoml_loader.dll
+          if-no-files-found: error
+
+  build:
+    needs: [prepare, loader]
+    strategy:
+      matrix:
+        include:
+          # portable: the exe alone, no installer
+          - os: windows-latest
+            args: --no-bundle
+            plain: true
+          # portable: an AppImage, built on an older system so it runs on more of them
+          - os: ubuntu-22.04
+            args: --bundles appimage
+            plain: false
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Tauri's system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: loader
+          path: loader
+
+      - name: Build and upload
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # the same in-game DLL in every build
+          CWOML_LOADER_DLL: ${{ github.workspace }}/loader/cwoml_loader.dll
+        with:
+          releaseId: ${{ needs.prepare.outputs.release }}
+          args: ${{ matrix.args }}
+          uploadPlainBinary: ${{ matrix.plain }}
+          # the game is 64-bit only, so the architecture is left out
+          releaseAssetNamePattern: CWOML_[version]_[platform][ext]
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/${{ needs.prepare.outputs.release }}" \
+            -F draft=false --silent

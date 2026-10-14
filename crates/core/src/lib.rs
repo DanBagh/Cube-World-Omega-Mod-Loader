@@ -21,6 +21,7 @@ pub mod refs;
 pub mod report;
 pub mod version;
 pub mod voxel;
+pub mod wine;
 
 #[cfg(test)]
 mod testing;

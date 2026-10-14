@@ -152,6 +152,8 @@ struct Applied {
     short: Vec<Short>,
     /// How many more warnings only concern the client this PC does not run.
     elsewhere: usize,
+    /// The game runs under Wine or Proton here.
+    wine: bool,
 }
 
 #[tauri::command]
@@ -406,7 +408,7 @@ fn loader_status(paths: State<Paths>) -> LoaderStatus {
     };
     let Some(dll) = loader::embedded() else {
         return blocked(
-            "The part that runs inside the game is only built for Windows so far.".into(),
+            "This build of the app does not have the part that runs inside the game.".into(),
         );
     };
     let game = match game::find(None, DEFAULT_CHANNEL) {
@@ -495,6 +497,7 @@ fn apply_profile(paths: State<Paths>) -> Result<Applied, String> {
             })
             .collect(),
         elsewhere: elsewhere.len(),
+        wine: cfg!(not(windows)),
     })
 }
 

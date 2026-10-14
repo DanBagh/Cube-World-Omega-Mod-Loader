@@ -8,6 +8,9 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A Linux build, `CWOML_<version>_linux.AppImage`, for the game under Wine or
+  Proton. It finds the game in the usual Wine prefixes, and the game needs the
+  DLL override `dbghelp=n,b` (see the README).
 - Mods can add new sounds to the game, up to 32 in all, instead of taking one
   of the game's own sound slots. Mods that use this need
   `"loader": ">=0.8.0"`.

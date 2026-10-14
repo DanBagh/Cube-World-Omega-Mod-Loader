@@ -12,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::game::Backend;
-use crate::{Error, Result};
+use crate::{Error, Result, wine};
 
 /// Plan file format the in-game loader understands.
 pub const PLAN_VERSION: u32 = 3;
@@ -231,7 +231,7 @@ impl Plan {
             out.push_str("endmodule\n");
         }
         for (key, source) in &self.redirects {
-            let _ = writeln!(out, "redirect\t{key}\t{}", source.display());
+            let _ = writeln!(out, "redirect\t{key}\t{}", wine::game_path(source));
         }
         out.push_str("end\n");
         out

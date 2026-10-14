@@ -14,7 +14,7 @@ use crate::features::{self, Build};
 use crate::game::Game;
 use crate::mods::Mod;
 use crate::plan::PLAN_NAME;
-use crate::{Error, Result};
+use crate::{Error, Result, wine};
 
 /// The name the game loads the loader under.
 pub const DLL_NAME: &str = "dbghelp.dll";
@@ -89,7 +89,7 @@ pub fn install(game_dir: &Path, dll: &[u8], home: &Path) -> Result<()> {
     }
     remove_earlier(game_dir)?;
     let pointer = game_dir.join(HOME_FILE);
-    let home = home.display().to_string();
+    let home = wine::game_path(home);
     fs::write(&pointer, home + "\n").map_err(|e| Error::io(&pointer, e))
 }
 

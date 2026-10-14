@@ -40,3 +40,22 @@ jobs:
 
       - name: Trampolines match their source
         run: cargo test -p cwoml-core --lib -- --ignored trampolines
+
+  linux:
+    # the app on Linux. The in-game DLL is a Windows one and is checked above
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Tauri's system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Backend
+        run: |
+          cargo clippy --workspace --exclude cwoml-loader --all-targets -- -D warnings
+          cargo test -p cwoml-core

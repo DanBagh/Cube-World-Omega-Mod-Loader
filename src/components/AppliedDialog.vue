@@ -40,6 +40,11 @@ const emit = defineEmits<{ close: []; launcher: [] }>()
         <p class="mt-1 text-xs text-muted" :title="applied.release">
           Game version {{ applied.version ?? applied.release }}
         </p>
+        <p v-if="applied.wine" class="mt-2 text-sm text-muted select-text">
+          Under Wine or Proton the mods only load with the DLL override
+          <code>dbghelp=n,b</code> set for the Wollay Launcher. See the README
+          for how.
+        </p>
 
         <ul
           v-if="

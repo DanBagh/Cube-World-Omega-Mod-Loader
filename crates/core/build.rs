@@ -4,13 +4,23 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
 
+/// A loader DLL to embed instead of building one.
+const PREBUILT: &str = "CWOML_LOADER_DLL";
+
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=../loader/src");
     println!("cargo:rerun-if-changed=../loader/Cargo.toml");
+    println!("cargo:rerun-if-env-changed={PREBUILT}");
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
     let embedded = out.join("loader.dll");
-    // the game is a Windows program. Elsewhere there is nothing to embed yet
+    // built for Windows elsewhere, for a build on another system
+    if let Some(dll) = env::var_os(PREBUILT) {
+        println!("cargo:rerun-if-changed={}", Path::new(&dll).display());
+        fs::copy(&dll, &embedded).unwrap_or_else(|e| panic!("{PREBUILT}: {e}"));
+        return;
+    }
+    // the game is a Windows program, so elsewhere there is nothing to embed
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         fs::write(&embedded, []).expect("write the empty loader");
         return;

@@ -121,6 +121,8 @@ export interface Applied {
   short: Short[]
   // how many more warnings only concern the game client this PC does not run
   elsewhere: number
+  // the game runs under Wine or Proton here
+  wine: boolean
 }
 
 export const api = {

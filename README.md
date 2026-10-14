@@ -15,7 +15,8 @@ Tech Stack: Tauri 2, Vue 3, TypeScript, Vite, Tailwind CSS and Reka UI.
 
 ## Using it
 
-Windows only for now.
+For Windows, and for Linux where the game runs under Wine or Proton (see
+[On Linux](#on-linux)).
 
 1. Download `CWOML_<version>_windows.exe` from the
    [latest release](https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/releases/latest) and put it in a folder of its
@@ -39,6 +40,24 @@ folder (see [Applying a profile](#applying-a-profile)).
 If something goes wrong, open an [issue](https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/issues) with what the Apply
 dialog said and `cwoml-data/loader.log`, which is written each time the game
 starts.
+
+### On Linux
+
+Download `CWOML_<version>_linux.AppImage`, make it executable and start it.
+It keeps its data in a `cwoml-data` folder beside the AppImage.
+
+The app looks for the Wollay Launcher in the Wine prefix that `WINEPREFIX`
+names, else in the prefixes Wine, Steam, Lutris, Heroic and Bottles make by
+default, and takes the one that installed the game last.
+
+Wine uses its own `dbghelp.dll` unless told otherwise, so the game only loads
+the mods with a DLL override, set once wherever the Wollay Launcher is
+started from:
+
+- Steam: launch options `WINEDLLOVERRIDES="dbghelp=n,b" %command%`
+- Lutris: Runner options, DLL overrides: `dbghelp` with the value `n,b`
+- Bottles: Settings, DLL overrides: `dbghelp` as native, then builtin
+- Wine itself: start the launcher with `WINEDLLOVERRIDES="dbghelp=n,b"`
 
 ## Contributor/Developer Setup
 
