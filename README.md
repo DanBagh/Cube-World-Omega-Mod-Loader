@@ -17,7 +17,7 @@ Tech Stack: Tauri 2, Vue 3, TypeScript, Vite, Tailwind CSS and Reka UI.
 
 Windows only for now.
 
-1. Download `cwoml_<version>_windows_x64.exe` from the
+1. Download `CWOML_<version>_windows.exe` from the
    [latest release](https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/releases/latest) and put it in a folder of its
    own. It keeps its data in a `cwoml-data` folder beside it.
 2. Start it. The app is not signed yet, so Windows may say it is

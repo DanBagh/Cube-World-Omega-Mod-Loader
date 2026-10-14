@@ -15,6 +15,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - The Rupees example plays its own pickup sound again, as an added sound.
+- The app's download is named `CWOML_<version>_windows.exe`.
 
 ### Removed
 

@@ -72,7 +72,8 @@ jobs:
           # portable: the exe alone, no installer
           args: --no-bundle
           uploadPlainBinary: true
-          releaseAssetNamePattern: cwoml_[version]_[platform]_[arch][ext]
+          # the game is 64-bit only, so the architecture is left out
+          releaseAssetNamePattern: CWOML_[version]_[platform][ext]
 
       - name: Attach the example mods
         if: hashFiles('example_mods/*/mod.json') != ''
