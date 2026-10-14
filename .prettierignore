@@ -2,3 +2,4 @@ dist
 bun.lock
 target
 src-tauri/gen
+example_mods

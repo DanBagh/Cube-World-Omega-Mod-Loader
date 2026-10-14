@@ -147,6 +147,18 @@ Profiles are in `cwoml-data/profiles.json`. A profile lists the mods added to
 it, which of them are on, and their order. A new profile starts empty or as a
 copy of another one.
 
+## Example mods
+
+`example_mods/` has two mods made for this loader. They also show what a
+`mod.json` can hold:
+
+- `rupees` turns gold coins into rupees: a new model, another model for each
+  size of pile with its own glow, a pickup sound and changed text.
+- `pet-food-labels` adds a line to the tooltip of every taming food, saying
+  which creature it is for.
+
+Each is attached to every release as a zip, ready to import.
+
 ## Applying a profile
 
 Apply makes the game start with the mods of the current profile. It works out

@@ -1,0 +1,296 @@
+{
+	"schema": 1,
+	"id": "pet-food-labels",
+	"name": "Pet Food Labels",
+	"version": "0.1.0",
+	"authors": ["DanBagh"],
+	"loader": ">=0.2.0",
+	"description": "Adds a tooltip line to every taming food saying which creature it is for.",
+	"tooltips": [
+		{
+			"type": 95,
+			"subtype": 17,
+			"line": "TAMES GREEN SLIME"
+		},
+		{
+			"type": 95,
+			"subtype": 18,
+			"line": "TAMES BLUE SLIME"
+		},
+		{
+			"type": 95,
+			"subtype": 19,
+			"line": "TAMES PINK SLIME"
+		},
+		{
+			"type": 95,
+			"subtype": 20,
+			"line": "TAMES YELLOW SLIME"
+		},
+		{
+			"type": 95,
+			"subtype": 22,
+			"line": "TAMES HORNET"
+		},
+		{
+			"type": 95,
+			"subtype": 23,
+			"line": "TAMES CRAB"
+		},
+		{
+			"type": 95,
+			"subtype": 24,
+			"line": "TAMES BAT"
+		},
+		{
+			"type": 95,
+			"subtype": 37,
+			"line": "TAMES MOLE"
+		},
+		{
+			"type": 95,
+			"subtype": 40,
+			"line": "TAMES COLLIE"
+		},
+		{
+			"type": 95,
+			"subtype": 43,
+			"line": "TAMES ALPACA"
+		},
+		{
+			"type": 95,
+			"subtype": 44,
+			"line": "TAMES BROWN ALPACA"
+		},
+		{
+			"type": 95,
+			"subtype": 46,
+			"line": "TAMES TURTLE"
+		},
+		{
+			"type": 95,
+			"subtype": 47,
+			"line": "TAMES TERRIER"
+		},
+		{
+			"type": 95,
+			"subtype": 48,
+			"line": "TAMES SCOTTISH TERRIER"
+		},
+		{
+			"type": 95,
+			"subtype": 51,
+			"line": "TAMES CAT"
+		},
+		{
+			"type": 95,
+			"subtype": 54,
+			"line": "TAMES PIG"
+		},
+		{
+			"type": 95,
+			"subtype": 55,
+			"line": "TAMES SHEEP"
+		},
+		{
+			"type": 95,
+			"subtype": 56,
+			"line": "TAMES BUNNY"
+		},
+		{
+			"type": 95,
+			"subtype": 57,
+			"line": "TAMES PORCUPINE"
+		},
+		{
+			"type": 95,
+			"subtype": 64,
+			"line": "TAMES MONKEY"
+		},
+		{
+			"type": 95,
+			"subtype": 68,
+			"line": "TAMES CROW"
+		},
+		{
+			"type": 95,
+			"subtype": 69,
+			"line": "TAMES CHICKEN"
+		},
+		{
+			"type": 95,
+			"subtype": 70,
+			"line": "TAMES SEAGULL"
+		},
+		{
+			"type": 95,
+			"subtype": 71,
+			"line": "TAMES PARROT"
+		},
+		{
+			"type": 95,
+			"subtype": 72,
+			"line": "TAMES FLY"
+		},
+		{
+			"type": 95,
+			"subtype": 73,
+			"line": "TAMES MIDGE"
+		},
+		{
+			"type": 95,
+			"subtype": 74,
+			"line": "TAMES MOSQUITO"
+		},
+		{
+			"type": 95,
+			"subtype": 75,
+			"line": "TAMES PLAIN RUNNER"
+		},
+		{
+			"type": 95,
+			"subtype": 76,
+			"line": "TAMES LEAF RUNNER"
+		},
+		{
+			"type": 95,
+			"subtype": 77,
+			"line": "TAMES SNOW RUNNER"
+		},
+		{
+			"type": 95,
+			"subtype": 78,
+			"line": "TAMES DESERT RUNNER"
+		},
+		{
+			"type": 95,
+			"subtype": 79,
+			"line": "TAMES PEACOCK"
+		},
+		{
+			"type": 95,
+			"subtype": 81,
+			"line": "TAMES DUCKBILL"
+		},
+		{
+			"type": 95,
+			"subtype": 82,
+			"line": "TAMES CROCODILE"
+		},
+		{
+			"type": 95,
+			"subtype": 90,
+			"line": "TAMES SQUID"
+		},
+		{
+			"type": 95,
+			"subtype": 91,
+			"line": "TAMES BITER"
+		},
+		{
+			"type": 95,
+			"subtype": 92,
+			"line": "TAMES KOALA"
+		},
+		{
+			"type": 95,
+			"subtype": 93,
+			"line": "TAMES SQUIRREL"
+		},
+		{
+			"type": 95,
+			"subtype": 94,
+			"line": "TAMES RACCOON"
+		},
+		{
+			"type": 95,
+			"subtype": 95,
+			"line": "TAMES OWL"
+		},
+		{
+			"type": 95,
+			"subtype": 96,
+			"line": "TAMES PENGUIN"
+		},
+		{
+			"type": 95,
+			"subtype": 99,
+			"line": "TAMES PONY"
+		},
+		{
+			"type": 95,
+			"subtype": 100,
+			"line": "TAMES CAMEL"
+		},
+		{
+			"type": 95,
+			"subtype": 102,
+			"line": "TAMES BARK BEETLE"
+		},
+		{
+			"type": 95,
+			"subtype": 103,
+			"line": "TAMES FIRE BEETLE"
+		},
+		{
+			"type": 95,
+			"subtype": 104,
+			"line": "TAMES SNOUT BEETLE"
+		},
+		{
+			"type": 95,
+			"subtype": 105,
+			"line": "TAMES LEMON BEETLE"
+		},
+		{
+			"type": 95,
+			"subtype": 137,
+			"line": "TAMES BEAVER"
+		},
+		{
+			"type": 95,
+			"subtype": 151,
+			"line": "TAMES WARTHOG"
+		},
+		{
+			"type": 95,
+			"subtype": 159,
+			"line": "TAMES RADISH CREATURE SPROUT"
+		},
+		{
+			"type": 95,
+			"subtype": 160,
+			"line": "TAMES PLANT CREATURE SPROUT"
+		},
+		{
+			"type": 95,
+			"subtype": 164,
+			"line": "TAMES BABY ELEPHANT"
+		},
+		{
+			"type": 95,
+			"subtype": 165,
+			"line": "TAMES BABY MAMMOTH"
+		},
+		{
+			"type": 95,
+			"subtype": 169,
+			"line": "TAMES FLAMINGO"
+		},
+		{
+			"type": 95,
+			"subtype": 192,
+			"line": "TAMES CATERPILLAR"
+		},
+		{
+			"type": 95,
+			"subtype": 193,
+			"line": "TAMES EARTH CATERPILLAR"
+		},
+		{
+			"type": 95,
+			"subtype": 194,
+			"line": "TAMES SNAIL"
+		}
+	]
+}
