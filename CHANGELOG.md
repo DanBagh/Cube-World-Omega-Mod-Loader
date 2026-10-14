@@ -6,6 +6,26 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-14
+
+### Added
+
+- The start screen shows how many mods are applied and from which profile,
+  after the game's version: `v0.1.1 | 2 mods | Loaded Default`.
+
+### Changed
+
+- The app shows the game's version number, such as 0.1.1, instead of its build
+  id, for game versions that have one. A mod's `game.releases` can name
+  either.
+- A mod's added sound that finds no free slot in the game is reported as
+  such, instead of as a sound the mod never added.
+
+### Fixed
+
+- The Rupees example plays its pickup sound again on game 0.1.0, which has no
+  free sound slots left. It now uses the coin drop sound, which it replaces.
+
 ## [0.1.0] - 2026-10-13
 
 First release, for testing.
@@ -27,5 +47,6 @@ First release, for testing.
   game update moved is skipped and listed, not applied in the wrong place.
 - Two example mods: Rupees and Pet Food Labels.
 
-[unreleased]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/releases/tag/v0.1.0
