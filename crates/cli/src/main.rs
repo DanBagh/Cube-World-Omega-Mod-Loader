@@ -3,19 +3,25 @@ use std::process::ExitCode;
 
 use cwoml_core::features::{self, Build};
 use cwoml_core::game::{self, DEFAULT_CHANNEL, Game};
+use cwoml_core::loader;
 use cwoml_core::mods::{self, Mod};
 use cwoml_core::plan::PLAN_NAME;
+use cwoml_core::report::Report;
 
 const USAGE: &str = "\
 cwoml status --mods DIR [--game-dir DIR] [--channel NAME]
     show the game install and which mods would load, in order
 cwoml plan --mods DIR --out DIR [--game-dir DIR] [--channel NAME]
     work out the patches and write plan.txt, with any converted models, to the out folder
+cwoml apply --mods DIR --out DIR [--game-dir DIR] [--channel NAME]
+    plan, then put the in-game loader into the game folder, reading its plan from the out folder
+cwoml remove --out DIR [--game-dir DIR] [--channel NAME]
+    take the loader out of the game folder and delete the plan
 cwoml import --mods DIR --zip FILE
     unpack a mod zip into the mods folder
 
 Without --game-dir the install managed by the official launcher is used.
-Nothing is written to the game folder.";
+Only apply and remove touch the game folder, and only the loader's own two files.";
 
 #[derive(Default)]
 struct Args {
@@ -84,7 +90,39 @@ fn print_mods(mods: &[Mod], order: &[usize]) {
     }
 }
 
+fn print_build(mods: &[Mod], report: &Report, tallies: &[features::Tally], overrides: usize) {
+    print!("{report}");
+    for found in mods {
+        for warning in &found.warnings {
+            println!("  ! {}: {warning}", found.id);
+        }
+    }
+    for tally in tallies {
+        println!(
+            "{}: {} of {} {}",
+            tally.backend.dll_name(),
+            tally.planned,
+            tally.wanted,
+            tally.feature
+        );
+    }
+    println!("File overrides: {overrides}");
+}
+
 fn run(args: Args) -> Result<(), String> {
+    let channel = args.channel.as_deref().unwrap_or(DEFAULT_CHANNEL);
+    if args.command == "remove" {
+        let out = args.out.ok_or("--out is required")?;
+        let game = game::find(args.game_dir.as_deref(), channel).map_err(|e| e.to_string())?;
+        let removed = loader::clear(&game, &out).map_err(|e| e.to_string())?;
+        let what = if removed {
+            "Removed the loader from"
+        } else {
+            "No loader in"
+        };
+        println!("{what} {}", game.root.display());
+        return Ok(());
+    }
     let mods_dir = args.mods.ok_or("--mods is required")?;
     if args.command == "import" {
         let zip = args.zip.ok_or("--zip is required")?;
@@ -98,7 +136,6 @@ fn run(args: Args) -> Result<(), String> {
         }
         return Ok(());
     }
-    let channel = args.channel.as_deref().unwrap_or(DEFAULT_CHANNEL);
     let game = game::find(args.game_dir.as_deref(), channel).map_err(|e| e.to_string())?;
     let mut mods = mods::load(&mods_dir);
     print_game(&game);
@@ -116,20 +153,23 @@ fn run(args: Args) -> Result<(), String> {
                 tallies,
             } = features::build(&game, &mut mods, &out).map_err(|e| e.to_string())?;
             print_mods(&mods, &order);
-            print!("{report}");
-            for tally in &tallies {
-                println!(
-                    "{}: {} of {} {} patch(es)",
-                    tally.backend.dll_name(),
-                    tally.planned,
-                    tally.wanted,
-                    tally.feature
-                );
-            }
-            println!("File overrides: {}", plan.redirects.len());
+            print_build(&mods, &report, &tallies, plan.redirects.len());
             let path = out.join(PLAN_NAME);
             plan.write(&path).map_err(|e| e.to_string())?;
             println!("Plan written to {}", path.display());
+        }
+        "apply" => {
+            let out = args.out.ok_or("--out is required")?;
+            let Build {
+                plan,
+                report,
+                order,
+                tallies,
+            } = loader::apply(&game, &mut mods, &out).map_err(|e| e.to_string())?;
+            print_mods(&mods, &order);
+            print_build(&mods, &report, &tallies, plan.redirects.len());
+            println!("Loader installed in {}", game.root.display());
+            println!("Start the game from the Wollay Launcher as usual.");
         }
         other => return Err(format!("unknown command {other}")),
     }

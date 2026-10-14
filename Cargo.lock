@@ -490,10 +490,20 @@ name = "cwoml-core"
 version = "0.1.0"
 dependencies = [
  "memchr",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
+ "windows-sys 0.61.2",
  "zip",
+]
+
+[[package]]
+name = "cwoml-loader"
+version = "0.1.0"
+dependencies = [
+ "cwoml-core",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -1,8 +1,9 @@
 //! Mod loading for Cube World Omega.
 //!
-//! Nothing here writes to the game folder. Mods are read and ordered (`mods`), the client
-//! DLLs are analysed (`pe`, `refs`), and each kind of mod content (`features`) turns into
-//! self-verifying memory patches in a `plan` that the in-game loader applies at startup.
+//! Mods are read and ordered (`mods`), the client DLLs are analysed (`pe`, `refs`), and
+//! each kind of mod content (`features`) turns into self-verifying memory patches in a
+//! `plan` that the in-game loader applies at startup. The game's own files are never
+//! changed. The one thing put into the game folder is that loader (`loader`).
 //!
 //! The game is in beta and changes often. Anything that depends on how a particular build
 //! was compiled lives in the feature that needs it, and a feature that cannot find its
@@ -11,6 +12,7 @@
 pub mod error;
 pub mod features;
 pub mod game;
+pub mod loader;
 pub mod mods;
 pub mod pe;
 pub mod plan;

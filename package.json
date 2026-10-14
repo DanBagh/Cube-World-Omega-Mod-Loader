@@ -17,7 +17,7 @@
     "preview": "vite preview",
     "check": "bun run check:frontend && bun run check:backend",
     "check:frontend": "prettier --write . && vue-tsc --noEmit",
-    "check:backend": "cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test -p cwoml-core",
+    "check:backend": "cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test -p cwoml-core -p cwoml-loader",
     "tauri": "tauri"
   },
   "dependencies": {
