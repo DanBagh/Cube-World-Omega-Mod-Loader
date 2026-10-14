@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { SwitchRoot, SwitchThumb } from "reka-ui"
 import type { ModView } from "../api"
 import ModIcon from "./ModIcon.vue"
 import ModNotices from "./ModNotices.vue"
 
-defineProps<{
+const props = defineProps<{
   mod: ModView
   first: boolean
   last: boolean
@@ -21,18 +22,54 @@ const emit = defineEmits<{
   remove: []
 }>()
 
-// [one, many] for each kind of content the backend counts
-const kinds: Record<string, [string, string]> = {
-  text: ["text change", "text changes"],
-  models: ["model", "models"],
-  sounds: ["sound", "sounds"],
-  files: ["other file", "other files"],
-}
+// What a mod changes, in a player's words. Each kind of content the backend counts falls
+// under one tag, and reads as [one, many] in that tag's tooltip
+const groups: [string, Record<string, [string, string]>][] = [
+  [
+    "Text",
+    {
+      text: ["text change", "text changes"],
+      tooltips: ["tooltip line", "tooltip lines"],
+    },
+  ],
+  [
+    "Models",
+    {
+      models: ["model replaced", "models replaced"],
+      groundModels: ["model for item piles", "models for item piles"],
+      glow: ["item that glows", "items that glow"],
+    },
+  ],
+  [
+    "Sounds",
+    {
+      sounds: ["sound", "sounds"],
+      pickupSounds: ["pickup sound", "pickup sounds"],
+      soundPitch: ["pitch change", "pitch changes"],
+    },
+  ],
+  ["Files", { files: ["other file", "other files"] }],
+]
 
-function counted(label: string, count: number) {
-  const [one, many] = kinds[label] ?? [label, label]
-  return `${count} ${count === 1 ? one : many}`
-}
+const tags = computed(() => {
+  const found = groups.map(([label, kinds]) => ({
+    label,
+    parts: props.mod.contents
+      .filter((content) => content.label in kinds)
+      .map(({ label, count }) => `${count} ${kinds[label][+(count !== 1)]}`),
+  }))
+  // a kind this version has no words for yet
+  const known = groups.flatMap(([, kinds]) => Object.keys(kinds))
+  found.push({
+    label: "Other",
+    parts: props.mod.contents
+      .filter((content) => !known.includes(content.label))
+      .map(({ label, count }) => `${count} ${label}`),
+  })
+  return found
+    .filter((tag) => tag.parts.length)
+    .map((tag) => ({ label: tag.label, detail: tag.parts.join(", ") }))
+})
 </script>
 
 <template>
@@ -83,15 +120,16 @@ function counted(label: string, count: number) {
       </p>
 
       <p
-        v-if="mod.contents.length || mod.unsupported.length"
-        class="mt-1.5 flex flex-wrap gap-1.5 text-xs"
+        v-if="tags.length || mod.unsupported.length"
+        class="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs"
       >
         <span
-          v-for="content in mod.contents"
-          :key="content.label"
+          v-for="tag in tags"
+          :key="tag.label"
           class="rounded border border-line px-1.5 py-0.5"
+          :title="tag.detail"
         >
-          {{ counted(content.label, content.count) }}
+          {{ tag.label }}
         </span>
         <span
           v-for="section in mod.unsupported"

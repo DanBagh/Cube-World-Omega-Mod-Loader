@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use crate::game::Backend;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Level {
     Info,
@@ -13,11 +15,15 @@ pub enum Level {
 pub struct Line {
     pub level: Level,
     pub text: String,
+    /// The client DLL the line is about. None for what holds whichever one runs.
+    pub client: Option<Backend>,
 }
 
 #[derive(Debug, Default)]
 pub struct Report {
     pub lines: Vec<Line>,
+    /// The client DLL being planned for. Lines added meanwhile are about it.
+    pub client: Option<Backend>,
 }
 
 impl Report {
@@ -36,7 +42,11 @@ impl Report {
             .iter()
             .any(|line| line.level == level && line.text == text)
         {
-            self.lines.push(Line { level, text });
+            self.lines.push(Line {
+                level,
+                text,
+                client: self.client,
+            });
         }
     }
 

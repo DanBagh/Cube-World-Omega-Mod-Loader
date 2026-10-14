@@ -5,16 +5,17 @@
 //! old one: `lea` instructions and pointers in data tables. That needs nothing specific
 //! to a build beyond the string still being there.
 //!
-//! Not ported yet: short text the compiler wrote into code as a constant (the " G" after
-//! a price).
+//! Short text the compiler wrote into code as a constant (the " G" after a price) has no
+//! string to repoint. `inline_text` handles it, and that part is build-specific.
 
 use std::fs;
 
 use serde_json::Value;
 
 use super::ModuleBuild;
+use super::inline_text::{self, InlineText};
 use crate::mods::{Mod, Notice};
-use crate::plan::{Group, Op};
+use crate::plan::{BLOB_PAD, Claim, Group, Op};
 use crate::refs::{SiteKind, string_sites};
 use crate::report::{Report, one_line};
 
@@ -185,7 +186,8 @@ pub fn collect(mods: &mut [Mod], order: &[usize], report: &mut Report) -> Vec<Te
     entries
 }
 
-fn latin1(text: &str) -> Option<Vec<u8>> {
+/// The game's strings are single-byte. None for text that has no such form.
+pub(super) fn latin1(text: &str) -> Option<Vec<u8>> {
     text.chars()
         .map(|c| u8::try_from(u32::from(c)).ok())
         .collect()
@@ -215,24 +217,50 @@ fn plan_one(module: &mut ModuleBuild, entry: &TextEntry, report: &mut Report) ->
             who.push(id);
         }
     }
+    let after_one = entry
+        .singular
+        .as_ref()
+        .map(|singular| format!(" (\"{}\" after 1)", one_line(singular, 30)))
+        .unwrap_or_default();
     let label = format!(
-        "\"{}\" -> \"{}\" [{}]",
+        "\"{}\" -> \"{}\"{after_one} [{}]",
         one_line(&entry.original, 40),
         one_line(&entry.value, 60),
         who.join("+")
     );
-    let (Some(old), Some(mut new)) = (latin1(&entry.original), latin1(&entry.value)) else {
+    let singular = entry.singular.as_deref().map(latin1);
+    let (Some(old), Some(mut new), Some(singular)) = (
+        latin1(&entry.original),
+        latin1(&entry.value),
+        singular.map_or(Some(None), |s| s.map(Some)),
+    ) else {
         report.warn(format!(
             "{backend}: {label}: only Latin-1 text can be patched; skipped"
         ));
         return false;
     };
-    if new.iter().any(|c| !(0x20..=0x7E).contains(c)) {
+    if new
+        .iter()
+        .chain(singular.iter().flatten())
+        .any(|c| !(0x20..=0x7E).contains(c))
+    {
         report.warn(format!("{backend}: {label}: contains characters outside printable ASCII; the game fonts only have ASCII glyphs"));
     }
 
     let found = string_sites(module.image, module.refs, &old);
     if found.is_empty() {
+        let inlined = inline_text::find(module.image, &old);
+        if !inlined.is_empty() {
+            let text = Inline {
+                id: group_id(&old),
+                label,
+                owner: format!("text \"{}\"", one_line(&entry.original, 20)),
+                old,
+                new,
+                singular,
+            };
+            return plan_inline(module, &text, &inlined, report);
+        }
         let mut terminated = old.clone();
         terminated.push(0);
         let why = if module
@@ -240,7 +268,7 @@ fn plan_one(module: &mut ModuleBuild, entry: &TextEntry, report: &mut Report) ->
             .find_bytes(&terminated, &[".rdata", ".data"])
             .is_empty()
         {
-            "is not in this build as a string (text the game writes into its code as a constant is not supported yet)"
+            "is not in this build"
         } else {
             "exists but nothing references it directly"
         };
@@ -317,6 +345,104 @@ fn plan_one(module: &mut ModuleBuild, entry: &TextEntry, report: &mut Report) ->
         label,
         ops,
     });
+    true
+}
+
+/// A text that is in the code as a constant, and what it becomes.
+struct Inline {
+    id: String,
+    label: String,
+    /// Who a claim on the code is recorded for.
+    owner: String,
+    old: Vec<u8>,
+    new: Vec<u8>,
+    singular: Option<Vec<u8>>,
+}
+
+fn plan_inline(
+    module: &mut ModuleBuild,
+    text: &Inline,
+    inlined: &[InlineText],
+    report: &mut Report,
+) -> bool {
+    let backend = module.backend.key();
+    let (label, old, new) = (&text.label, &text.old, &text.new);
+    let places = inlined.len();
+    let claim = |start: u32, end: u32| Claim {
+        start,
+        end,
+        owner: text.owner.clone(),
+    };
+    if new.len() == old.len() && text.singular.is_none() {
+        let mut ops = Vec::new();
+        for place in inlined {
+            let end = place.imm + old.len() as u32;
+            module.plan.claims.push(claim(place.imm, end));
+            ops.push(Op::Bytes {
+                rva: place.imm,
+                expect: old.clone(),
+                new: new.clone(),
+            });
+        }
+        module.plan.groups.push(Group {
+            id: text.id.clone(),
+            label: format!("{label} ({places} inlined)"),
+            ops,
+        });
+        return true;
+    }
+    // another length or two forms: every place is rebuilt, so it is all of them or none
+    let singular = text.singular.as_deref();
+    let changes: Result<Vec<_>, String> = inlined
+        .iter()
+        .map(|place| inline_text::resize(module.image, place, old, new, singular))
+        .collect();
+    let changes = match changes {
+        Ok(changes) => changes,
+        Err(problem) => {
+            let no_singular = if singular.is_some() {
+                " and no \"singular\""
+            } else {
+                ""
+            };
+            report.warn(format!(
+                "{backend}: {label}: this text is written into the code as a constant in {places} place(s) and cannot be rebuilt ({problem}); use a replacement of exactly {} characters{no_singular}; skipped",
+                old.len()
+            ));
+            return false;
+        }
+    };
+    let longest = new.len().max(singular.map_or(0, <[u8]>::len)) as i32;
+    let tightest = changes.iter().map(|change| change.capacity).min();
+    let mut ops = Vec::new();
+    for change in changes {
+        let start = module.plan.reserve();
+        let blob = &mut module.plan.blob;
+        blob.extend_from_slice(&change.stub);
+        blob.resize(blob.len() + BLOB_PAD, 0);
+        module.plan.claims.push(claim(change.start, change.end));
+        ops.extend(change.returns.iter().map(|&offset| Op::BlobRel32 {
+            blob_offset: start + offset,
+            target: change.end,
+        }));
+        ops.push(change.check);
+        ops.push(Op::Hook {
+            rva: change.start,
+            expect: change.original,
+            blob_offset: start,
+        });
+    }
+    module.plan.groups.push(Group {
+        id: text.id.clone(),
+        label: format!("{label} ({places} inlined, resized)"),
+        ops,
+    });
+    if let Some(tightest) = tightest.filter(|_| longest > old.len() as i32) {
+        report.say(format!(
+            "{label}: the smallest buffer the game writes this into holds {tightest} characters, which leaves {} for the text in front of it",
+            tightest - 1 - longest
+        ));
+    }
     true
 }
 

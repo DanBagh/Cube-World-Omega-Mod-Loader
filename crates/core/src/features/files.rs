@@ -42,12 +42,14 @@ fn game_key(target: &str) -> Option<String> {
     (!outside && !executable).then_some(key)
 }
 
-fn name_for(data: &[u8]) -> String {
-    // FNV-1a: the same model always gets the same file
+/// Sixteen hex digits that are the same for the same bytes, for naming files after
+/// what they hold.
+pub(super) fn content_hash(data: &[u8]) -> String {
+    // FNV-1a
     let hash = data.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &b| {
         (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)
     });
-    format!("{hash:016x}.cub")
+    format!("{hash:016x}")
 }
 
 /// The `.cub` the game is given for a mod's model file: `source` itself once it has been
@@ -77,7 +79,7 @@ pub fn usable_model(
         return Ok(source.to_path_buf());
     }
     let data = model.to_cub();
-    let path = converted.join(name_for(&data));
+    let path = converted.join(format!("{}.cub", content_hash(&data)));
     fs::create_dir_all(converted)
         .and_then(|()| fs::write(&path, data))
         .map_err(|e| e.to_string())?;

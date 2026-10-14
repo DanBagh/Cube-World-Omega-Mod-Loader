@@ -47,6 +47,26 @@ pub struct Game {
     pub modules: BTreeMap<Backend, PathBuf>,
 }
 
+impl Game {
+    /// The client DLL the game runs on this PC: the avx2 one where the processor has
+    /// AVX2, which is taken to be the game's own rule when it is left to choose.
+    pub fn client(&self) -> Option<Backend> {
+        #[cfg(target_arch = "x86_64")]
+        let avx2 = std::arch::is_x86_feature_detected!("avx2");
+        #[cfg(not(target_arch = "x86_64"))]
+        let avx2 = false;
+        let wanted = if avx2 {
+            Backend::Avx2
+        } else {
+            Backend::Baseline
+        };
+        if self.modules.contains_key(&wanted) {
+            return Some(wanted);
+        }
+        self.modules.keys().next().copied()
+    }
+}
+
 /// Where the official launcher keeps its files, if this OS has a known place for it.
 pub fn launcher_dir() -> Option<PathBuf> {
     // only set on Windows. A Wine or Proton prefix is not looked up yet

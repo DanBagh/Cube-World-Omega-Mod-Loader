@@ -27,6 +27,24 @@ fn u32_at(bytes: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_le_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
 }
 
+/// The `_type` of a MATL chunk: a material id, then a count of (length, key) (length,
+/// value) string pairs.
+fn material_type(body: &[u8]) -> Option<&[u8]> {
+    let mut at = 8;
+    for _ in 0..u32_at(body, 4)? {
+        let mut pair = [&body[..0]; 2];
+        for part in &mut pair {
+            let length = u32_at(body, at)? as usize;
+            *part = body.get(at + 4..at + 4 + length)?;
+            at += 4 + length;
+        }
+        if pair[0] == b"_type" {
+            return Some(pair[1]);
+        }
+    }
+    None
+}
+
 impl Model {
     /// Reads a `.cub` or `.vox` file, going by its extension.
     pub fn load(path: &Path) -> Result<Model, String> {
@@ -98,10 +116,17 @@ impl Model {
 
     /// The first model of a MagicaVoxel file, with its palette applied.
     pub fn from_vox(data: &[u8]) -> Result<Model, String> {
+        Ok(Model::from_vox_lit(data)?.0)
+    }
+
+    /// The same, and the cells whose palette colour has the "Emit" material of
+    /// MagicaVoxel's render tab.
+    pub fn from_vox_lit(data: &[u8]) -> Result<(Model, Vec<[u32; 3]>), String> {
         if data.get(..4) != Some(b"VOX ") || data.get(8..12) != Some(b"MAIN") {
             return Err("not a MagicaVoxel .vox file".into());
         }
         let (mut size, mut cells, mut palette) = (None, None, None);
+        let mut emissive: Vec<u8> = Vec::new();
         let mut at = 20;
         while let (Some(kind), Some(length), Some(children)) = (
             data.get(at..at + 4),
@@ -120,6 +145,9 @@ impl Model {
                     cells = body.get(4..4 + 4 * count);
                 }
                 b"RGBA" => palette = Some(body),
+                b"MATL" if material_type(body) == Some(b"_emit") => emissive.push(body[0]),
+                // the chunk older files use: material id, then type 3 for emissive
+                b"MATT" if u32_at(body, 4) == Some(3) => emissive.push(body[0]),
                 _ => {}
             }
             at += 12 + length as usize + children as usize;
@@ -131,19 +159,25 @@ impl Model {
             .filter(|p| p.len() >= 1020)
             .ok_or("the .vox file has no palette; open and re-save it in MagicaVoxel")?;
         let mut voxels = BTreeMap::new();
+        let mut lit = Vec::new();
         for &[x, y, z, colour] in cells.as_chunks::<4>().0 {
             if colour != 0 {
                 let entry = 4 * (colour as usize - 1);
+                let cell = [u32::from(x), u32::from(y), u32::from(z)];
                 voxels.insert(
-                    [u32::from(x), u32::from(y), u32::from(z)],
+                    cell,
                     [palette[entry], palette[entry + 1], palette[entry + 2]],
                 );
+                if emissive.contains(&colour) {
+                    lit.push(cell);
+                }
             }
         }
-        Ok(Model {
+        let model = Model {
             size: [x, y, z],
             voxels,
-        })
+        };
+        Ok((model, lit))
     }
 
     pub fn to_vox(&self) -> Result<Vec<u8>, String> {

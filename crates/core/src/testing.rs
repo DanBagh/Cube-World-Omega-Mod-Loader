@@ -37,6 +37,12 @@ impl TinyPe {
         rva
     }
 
+    /// Overwrites machine code already appended, for jumps to code that follows them.
+    pub fn patch(&mut self, rva: u32, bytes: &[u8]) {
+        let at = (rva - 0x1000) as usize;
+        self.text[at..at + bytes.len()].copy_from_slice(bytes);
+    }
+
     /// Appends read-only data and returns its RVA.
     pub fn rdata(&mut self, bytes: &[u8]) -> u32 {
         let rva = 0x2000 + self.rdata.len() as u32;
