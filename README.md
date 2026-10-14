@@ -109,6 +109,22 @@ There are no installers. The output is:
 
 Run that file to start the built app. It can be copied anywhere first.
 
+## Releasing
+
+Releases are built by GitHub Actions when a version tag is pushed. The
+version is kept in one place: `version` under `[workspace.package]` in
+`Cargo.toml`.
+
+1. Set the new version there.
+2. Add a section for it to `CHANGELOG.md`, following
+   [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+3. Commit, then tag and push the tag:
+   `git tag v0.2.0` and `git push origin v0.2.0`
+
+The workflow checks that the tag matches the version, builds the Windows exe
+and publishes a GitHub release with that changelog section as its notes. Each
+folder in `example_mods/` is zipped and attached to the release too.
+
 ## Data
 
 The loader keeps its data in a `cwoml-data` folder beside the executable
