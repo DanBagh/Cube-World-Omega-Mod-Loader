@@ -1,0 +1,33 @@
+{
+	"schema": 1,
+	"id": "rupees",
+	"name": "Rupees",
+	"version": "0.1.0",
+	"authors": ["DanBagh"],
+	"description": "Replaces gold coins with rupees from The Legend of Zelda.",
+	"loader": ">=0.7.0",
+	"sounds": {
+		"rupee-get": "assets/rupee-get.wav"
+	},
+	"files": {
+		"sprites/gold-coin.cub": "assets/rupee-green.vox",
+		"sounds/drop-coin.wav": "assets/rupee-get.wav"
+	},
+	"groundModels": [
+		{ "type": 43, "amount": 5, "model": "assets/rupee-blue.vox" },
+		{ "type": 43, "amount": 20, "model": "assets/rupee-red.vox" },
+		{ "type": 43, "amount": 50, "model": "assets/rupee-purple.vox" },
+		{ "type": 43, "amount": 100, "model": "assets/rupee-silver.vox" },
+		{ "type": 43, "amount": 300, "model": "assets/rupee-gold.vox" }
+	],
+	"glow": [{ "type": 43, "model": "assets/rupee-green.vox" }],
+	"pickupSounds": [{ "type": 43, "sound": "rupee-get" }],
+	"soundPitch": {
+		"sounds/drop-coin.wav": 1.0
+	},
+	"text": [
+		{ "match": "GOLD COIN", "set": "RUPEE" },
+		{ "match": "GOLDMUENZE", "set": "RUPIE" },
+		{ "match": " G", "set": " RUPEES", "singular": " RUPEE" }
+	]
+}

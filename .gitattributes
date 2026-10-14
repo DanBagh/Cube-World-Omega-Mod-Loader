@@ -2,3 +2,5 @@
 *.png binary
 *.ico binary
 *.icns binary
+*.vox binary
+*.wav binary

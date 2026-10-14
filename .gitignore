@@ -3,7 +3,7 @@ dist
 *.local
 *.log
 
-src-tauri/target
+target
 src-tauri/gen/schemas
 
 .vscode/*

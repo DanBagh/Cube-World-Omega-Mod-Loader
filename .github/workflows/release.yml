@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # the whole history, to tell whether the tag is on main
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+
+      - name: Check the tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME is not on main"
+            exit 1
+          fi
+
+      - name: Check the tag against the app version
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 |
+            jq -r '.packages[] | select(.name == "cwo-mod-loader") | .version')
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the app version $version in Cargo.toml"
+            exit 1
+          fi
+
+      - name: Release notes from the changelog
+        id: notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # the section of this version, up to the next one or the links at the end
+          awk -v heading="## [$version]" '
+            index($0, heading) == 1 { found = 1; next }
+            found && (/^## \[/ || /^\[.*\]: /) { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no section for $version"
+            exit 1
+          fi
+          {
+            echo "body<<END_OF_NOTES"
+            cat notes.md
+            echo "END_OF_NOTES"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: CWOML ${{ github.ref_name }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          # portable: the exe alone, no installer
+          args: --no-bundle
+          uploadPlainBinary: true
+          releaseAssetNamePattern: cwoml_[version]_[platform]_[arch][ext]
+
+      - name: Attach the example mods
+        if: hashFiles('example_mods/*/mod.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p mod-zips
+          for mod in example_mods/*/; do
+            name=$(basename "$mod")
+            # mod.json at the top of the zip, as the app expects
+            (cd "$mod" && 7z a -tzip "../../mod-zips/$name.zip" . '-x!*.zip' > /dev/null)
+          done
+          gh release upload "$GITHUB_REF_NAME" mod-zips/*.zip --clobber

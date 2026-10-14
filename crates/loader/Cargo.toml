@@ -1,0 +1,26 @@
+[package]
+name = "cwoml-loader"
+description = "The DLL that applies a plan inside Cube World Omega"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+# installed into the game as dbghelp.dll. Built under that name it would be loaded by
+# every program in the build folder that imports dbghelp.dll
+name = "cwoml_loader"
+crate-type = ["cdylib"]
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Globalization",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Memory",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+cwoml-core = { path = "../core" }

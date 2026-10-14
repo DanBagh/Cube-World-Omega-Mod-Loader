@@ -8,6 +8,8 @@
   --color-muted: #6b6b66;
   --color-accent: #2f7d4f;
   --color-on-accent: #ffffff;
+  --color-danger: #b3261e;
+  --color-warn: #8a5a00;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,5 +21,61 @@
     --color-muted: #9a9c94;
     --color-accent: #4fae76;
     --color-on-accent: #0e120f;
+    --color-danger: #f2867d;
+    --color-warn: #e0b050;
+  }
+}
+
+/* a thin rounded thumb with no track and no arrows, in every webview Tauri uses */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 6px;
+    background-color: color-mix(in srgb, var(--color-muted) 55%, transparent);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-muted);
+  }
+}
+
+@layer components {
+  .btn {
+    @apply rounded-md border border-line bg-surface px-3 py-1.5 text-sm outline-accent hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 enabled:cursor-pointer disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent outline-accent focus-visible:outline-2 focus-visible:outline-offset-2 enabled:cursor-pointer enabled:hover:brightness-110 disabled:opacity-50;
+  }
+
+  .btn-danger {
+    @apply rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-danger outline-danger hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 enabled:cursor-pointer disabled:opacity-50;
+  }
+
+  .field {
+    @apply rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm outline-accent placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2;
+  }
+
+  .menu-item {
+    @apply cursor-pointer rounded px-2.5 py-1.5 text-sm outline-none data-disabled:cursor-default data-disabled:opacity-50 data-highlighted:bg-canvas;
+  }
+
+  .overlay {
+    @apply fixed inset-0 bg-black/40;
+  }
+
+  .dialog {
+    @apply fixed top-1/2 left-1/2 w-96 max-w-[90vw] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line bg-surface p-5 shadow-lg;
   }
 }
