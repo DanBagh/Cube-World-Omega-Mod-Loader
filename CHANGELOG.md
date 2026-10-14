@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-14
+
 ### Added
 
 - A Linux build, `CWOML_<version>_linux.AppImage`, for the game under Wine or
@@ -69,6 +71,7 @@ First release, for testing.
   game update moved is skipped and listed, not applied in the wrong place.
 - Two example mods: Rupees and Pet Food Labels.
 
-[unreleased]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/releases/tag/v0.1.0
