@@ -17,6 +17,7 @@ pub mod item_models;
 pub mod pickup_sounds;
 pub mod sound_pitch;
 pub mod sounds;
+pub mod start_screen;
 pub mod stub;
 pub mod text;
 pub mod tooltips;
@@ -124,8 +125,13 @@ pub struct Build {
 /// `.vox`, in `work_dir`. The game folder is not touched.
 ///
 /// What is wrong with one mod's own entries is added to that mod's `warnings`. The
-/// report holds the rest.
-pub fn build(game: &Game, mods: &mut [Mod], work_dir: &Path) -> Result<Build> {
+/// report holds the rest. `profile` is named on the start screen, after the number of mods.
+pub fn build(
+    game: &Game,
+    mods: &mut [Mod],
+    work_dir: &Path,
+    profile: Option<&str>,
+) -> Result<Build> {
     let mut report = Report::default();
     let order = mods::resolve(mods, game);
     let texts = text::collect(mods, &order, &mut report);
@@ -178,6 +184,7 @@ pub fn build(game: &Game, mods: &mut [Mod], work_dir: &Path) -> Result<Build> {
         None => sounds::Added::new(),
     };
 
+    let note = start_screen::note(order.len(), profile);
     let mut modules = Vec::new();
     let mut tallies = Vec::new();
     for (backend, image, refs) in &clients {
@@ -213,6 +220,7 @@ pub fn build(game: &Game, mods: &mut [Mod], work_dir: &Path) -> Result<Build> {
         tally("model(s) by amount", planned, ground.len());
         let planned = sound_pitch::plan(&mut module, &pitches, &added, &mut report);
         tally("sound pitch(es)", planned, pitches.len());
+        start_screen::plan(&mut module, &note, &mut report);
         module.plan.finalize();
         modules.push(module.plan);
     }
@@ -242,7 +250,7 @@ mod tests {
     use std::{env, fs};
 
     use super::stub::Stub;
-    use super::{ground_models, item_models, pickup_sounds, sound_pitch, tooltips};
+    use super::{ground_models, item_models, pickup_sounds, sound_pitch, start_screen, tooltips};
 
     /// The assembler of the MSVC build tools: the one `ML64` names, or the newest installed.
     fn ml64() -> Option<PathBuf> {
@@ -300,6 +308,7 @@ mod tests {
             ("pitch_hook", sound_pitch::STUB),
             ("item_model", item_models::STUB),
             ("ground_model", ground_models::STUB),
+            ("start_screen", start_screen::STUB),
         ] {
             let object = out.path().join(format!("{name}.obj"));
             let done = Command::new(&ml64)

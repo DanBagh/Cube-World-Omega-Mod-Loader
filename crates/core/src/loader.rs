@@ -110,11 +110,12 @@ pub fn remove(game_dir: &Path) -> Result<bool> {
 
 /// Plans `mods` for `game`, writes the plan and any converted models into `home`, and
 /// puts the loader into the game folder to apply it the next time the game starts.
-pub fn apply(game: &Game, mods: &mut [Mod], home: &Path) -> Result<Build> {
+/// `profile` is named on the start screen.
+pub fn apply(game: &Game, mods: &mut [Mod], home: &Path, profile: Option<&str>) -> Result<Build> {
     let dll = embedded()
         .ok_or_else(|| Error::invalid("the in-game loader is not built for this system"))?;
     let home = std::path::absolute(home).map_err(|e| Error::io(home, e))?;
-    let build = features::build(game, mods, &home)?;
+    let build = features::build(game, mods, &home, profile)?;
     build.plan.write(&home.join(PLAN_NAME))?;
     install(&game.root, dll, &home)?;
     Ok(build)

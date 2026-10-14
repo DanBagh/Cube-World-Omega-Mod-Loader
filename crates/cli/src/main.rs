@@ -11,10 +11,12 @@ use cwoml_core::report::Report;
 const USAGE: &str = "\
 cwoml status --mods DIR [--game-dir DIR] [--channel NAME]
     show the game install and which mods would load, in order
-cwoml plan --mods DIR --out DIR [--game-dir DIR] [--channel NAME]
+cwoml plan --mods DIR --out DIR [--profile NAME] [--game-dir DIR] [--channel NAME]
     work out the patches and write plan.txt, with any converted models, to the out folder
-cwoml apply --mods DIR --out DIR [--game-dir DIR] [--channel NAME]
+cwoml apply --mods DIR --out DIR [--profile NAME] [--game-dir DIR] [--channel NAME]
     plan, then put the in-game loader into the game folder, reading its plan from the out folder
+
+--profile names a profile on the start screen, after the number of mods.
 cwoml remove --out DIR [--game-dir DIR] [--channel NAME]
     take the loader out of the game folder and delete the plan
 cwoml import --mods DIR --zip FILE
@@ -31,6 +33,7 @@ struct Args {
     channel: Option<String>,
     out: Option<PathBuf>,
     zip: Option<PathBuf>,
+    profile: Option<String>,
 }
 
 fn parse(mut raw: impl Iterator<Item = String>) -> Result<Args, String> {
@@ -46,6 +49,7 @@ fn parse(mut raw: impl Iterator<Item = String>) -> Result<Args, String> {
             "--channel" => args.channel = Some(value()?),
             "--out" => args.out = Some(value()?.into()),
             "--zip" => args.zip = Some(value()?.into()),
+            "--profile" => args.profile = Some(value()?),
             _ => return Err(format!("unknown option {flag}")),
         }
     }
@@ -158,7 +162,8 @@ fn run(args: Args) -> Result<(), String> {
                 report,
                 order,
                 tallies,
-            } = features::build(&game, &mut mods, &out).map_err(|e| e.to_string())?;
+            } = features::build(&game, &mut mods, &out, args.profile.as_deref())
+                .map_err(|e| e.to_string())?;
             print_mods(&mods, &order);
             print_build(&mods, &report, &tallies, plan.redirects.len());
             let path = out.join(PLAN_NAME);
@@ -172,7 +177,8 @@ fn run(args: Args) -> Result<(), String> {
                 report,
                 order,
                 tallies,
-            } = loader::apply(&game, &mut mods, &out).map_err(|e| e.to_string())?;
+            } = loader::apply(&game, &mut mods, &out, args.profile.as_deref())
+                .map_err(|e| e.to_string())?;
             print_mods(&mods, &order);
             print_build(&mods, &report, &tallies, plan.redirects.len());
             println!("Loader installed in {}", game.root.display());

@@ -204,6 +204,9 @@ The in-game DLL goes by that name because `cubeworld.exe` asks for `dbghelp.dll`
 itself, so Windows always finds the one beside it. It hands every call on to
 the real one in the Windows folder.
 
+While mods are applied, the start screen shows how many and from which profile
+after the game's version, for example `v0.1.1 | 2 mods | Loaded Default`.
+
 What was applied is noted in `profiles.json`. The mod list is grayed out
 while the mods are off or the game has another profile, and a line above it
 says when the profile has changed since it was applied.

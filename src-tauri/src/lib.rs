@@ -446,8 +446,9 @@ fn apply_profile(paths: State<Paths>) -> Result<Applied, String> {
     let profiles = read_profiles(&paths)?;
     let mut found = mods::load(&paths.mods());
     profiles::apply(&mut found, &profiles.active().mods);
-    let build = loader::apply(&game, &mut found, &paths.data).map_err(|e| e.to_string())?;
     let name = &profiles.active().name;
+    let build =
+        loader::apply(&game, &mut found, &paths.data, Some(name)).map_err(|e| e.to_string())?;
     let loaded = build.order.iter().map(|&index| &found[index]);
     record(&paths, Some(InGame::new(name, loaded)))?;
     let client = game.client();
