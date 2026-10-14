@@ -26,7 +26,7 @@ pub const HOME_FILE: &str = "cwoml.txt";
 /// An export only the loader has. Its name in a file is how the loader is recognised.
 pub const MARKER: &str = "CwomlLoaderInfo";
 
-/// The loader as built with this launcher. None on a system it is not built for.
+/// The in-game loader as built with this app. None on a system it is not built for.
 pub fn embedded() -> Option<&'static [u8]> {
     let dll: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/loader.dll"));
     (!dll.is_empty()).then_some(dll)

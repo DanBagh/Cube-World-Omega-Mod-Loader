@@ -65,7 +65,7 @@ The backend is a Cargo workspace:
   the patches. Each kind of mod content is one module in `src/features/`.
 - `crates/loader/` is the DLL that runs inside the game. It applies the plan
   the library writes and does nothing else. The library's build script builds
-  it and embeds it, so the launcher stays one file.
+  it and embeds it, so the app stays one file.
 - `crates/cli/` is a small command line tool over the library, for trying
   things without the app:
   `cargo run -p cwoml-cli -- plan --mods <folder> --out <folder>`
@@ -103,7 +103,7 @@ bun run tauri build
 
 There are no installers. The output is:
 
-- Windows: `target/release/cwo-mod-launcher.exe`
+- Windows: `target/release/cwo-mod-loader.exe`
 - Linux: an AppImage under `target/release/bundle/`
 - macOS: a `.app` under `target/release/bundle/macos/`
 
@@ -111,7 +111,7 @@ Run that file to start the built app. It can be copied anywhere first.
 
 ## Data
 
-The launcher keeps its data in a `cwoml-data` folder beside the executable
+The loader keeps its data in a `cwoml-data` folder beside the executable
 (beside the AppImage file on Linux). If that folder cannot be created, and
 always on macOS, it uses the per-user app data folder instead.
 
@@ -134,18 +134,18 @@ copy of another one.
 ## Applying a profile
 
 Apply makes the game start with the mods of the current profile. It works out
-their patches, writes them to `cwoml-data/plan.txt` and puts the loader into
-the game folder. It does not start the game. Game must be started from the Wollay
+their patches, writes them to `cwoml-data/plan.txt` and puts the in-game DLL
+into the game folder. It does not start the game. Game must be started from the Wollay
 Launcher itself.
 
 Two files are put into the game folder, beside `cubeworld.exe`:
-`dbghelp.dll`, which is the loader, and `cwoml.txt`, which tells it where
+`dbghelp.dll`, which is the in-game DLL, and `cwoml.txt`, which tells it where
 `cwoml-data` is. None of the game's own files are changed. Disable mods takes
 both out again, and the game starts plain. Enable mods puts them back with
-the current profile. A `dbghelp.dll` that is not the loader is never replaced
+the current profile. A `dbghelp.dll` that is not ours is never replaced
 or removed.
 
-The loader goes by that name because `cubeworld.exe` asks for `dbghelp.dll`
+The in-game DLL goes by that name because `cubeworld.exe` asks for `dbghelp.dll`
 itself, so Windows always finds the one beside it. It hands every call on to
 the real one in the Windows folder.
 
@@ -153,10 +153,10 @@ What was applied is noted in `profiles.json`. The mod list is grayed out
 while the mods are off or the game has another profile, and a line above it
 says when the profile has changed since it was applied.
 
-A game update installs into a new folder without the loader, so the mods
+A game update installs into a new folder without the in-game DLL, so the mods
 show as off. Enable them again after one.
 
-When the game starts, the loader writes what it did to
+When the game starts, the in-game DLL writes what it did to
 `cwoml-data/loader.log`. A patch whose place in the game no longer looks the
 way the plan expects is skipped and named there.
 

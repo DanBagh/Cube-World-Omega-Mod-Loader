@@ -330,7 +330,7 @@ const disableMods = () =>
     await refreshLoader()
   })
 
-// the folder may have changed outside the launcher
+// the folder may have changed outside this app
 watch(browsing, (open) => {
   if (open) attempt(refreshLibrary)
 })

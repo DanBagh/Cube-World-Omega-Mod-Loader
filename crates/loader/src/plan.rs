@@ -1,7 +1,7 @@
 //! Reading the plan file. `cwoml-core` writes it, in `plan.rs` there.
 //!
 //! Tab-separated lines. A line that cannot be read spoils only the group it is in, and a
-//! line of a kind this version does not know is skipped, so a newer launcher can add to
+//! line of a kind this version does not know is skipped, so a newer app can add to
 //! the format.
 
 /// Plan file format this loader understands.
@@ -208,7 +208,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_what_the_launcher_writes() {
+    fn reads_what_the_core_writes() {
         use std::collections::BTreeMap;
 
         use cwoml_core::game::Backend;

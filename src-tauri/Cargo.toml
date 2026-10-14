@@ -1,5 +1,5 @@
 [package]
-name = "cwo-mod-launcher"
+name = "cwo-mod-loader"
 version = "0.1.0"
 description = "Mod manager for Cube World Omega"
 license = "GPL-3.0-only"
@@ -7,7 +7,7 @@ edition = "2024"
 
 [lib]
 # distinct from the bin name, same-named lib and bin collide on Windows
-name = "cwo_mod_launcher_lib"
+name = "cwo_mod_loader_lib"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

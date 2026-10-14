@@ -501,7 +501,7 @@ fn remove_loader(paths: State<Paths>) -> Result<bool, String> {
     Ok(removed)
 }
 
-// portable: data sits beside the launcher, falling back to the per-user dir
+// portable: data sits beside the executable, falling back to the per-user dir
 fn data_dir(app: &tauri::AppHandle) -> PathBuf {
     // a .app bundle must not be written into
     if !cfg!(target_os = "macos") {

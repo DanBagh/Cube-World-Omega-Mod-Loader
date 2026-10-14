@@ -1,4 +1,4 @@
-//! The DLL that applies a plan inside the game. The launcher installs it beside
+//! The DLL that applies a plan inside the game. The app installs it beside
 //! `cubeworld.exe` as `dbghelp.dll`.
 //!
 //! `cubeworld.exe` imports dbghelp.dll itself, and its own folder is searched first, so a
@@ -9,7 +9,7 @@
 //! The client DLL the plan is for is loaded later, so this waits for it (see `client`) and
 //! applies the plan once the client's imports are bound and before any of its code runs.
 //!
-//! It does as little as it can. The launcher works everything out ahead of time and writes
+//! It does as little as it can. The app works everything out ahead of time and writes
 //! a plan of exact patches that each name the bytes they expect to replace. This forwards
 //! the real dbghelp.dll, applies the plan to the client, and serves replacement files by
 //! hooking the client's imports. Nothing in the game folder is changed.
@@ -27,9 +27,9 @@ mod patch;
 #[cfg(windows)]
 mod redirect;
 
-/// Folder the plan is read from and the log written to, for running without the launcher.
+/// Folder the plan is read from and the log written to, for running without the app.
 pub const HOME_VARIABLE: &str = "CWOML_HOME";
-/// Beside the DLL: a text file whose first line is that folder. The launcher writes it.
+/// Beside the DLL: a text file whose first line is that folder. The app writes it.
 pub const HOME_FILE: &str = "cwoml.txt";
 pub const PLAN_NAME: &str = "plan.txt";
 pub const LOG_NAME: &str = "loader.log";
@@ -135,7 +135,7 @@ mod entry {
         log::flush();
     }
 
-    /// Lets the launcher tell this file from someone else's dbghelp.dll before it replaces
+    /// Lets the app tell this file from someone else's dbghelp.dll before it replaces
     /// or removes it.
     #[unsafe(no_mangle)]
     pub extern "C" fn CwomlLoaderInfo() -> *const c_char {
