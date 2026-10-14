@@ -26,10 +26,35 @@ pub struct Profile {
     pub mods: Vec<Entry>,
 }
 
+/// What the game was last given, to tell whether a profile is the one it starts with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InGame {
+    /// The profile that was applied.
+    pub profile: String,
+    /// The mods of it that loaded, each as `id version`, in load order.
+    pub mods: Vec<String>,
+}
+
+impl InGame {
+    /// `loaded` are the mods that load, in load order.
+    pub fn new<'a>(profile: &str, loaded: impl IntoIterator<Item = &'a Mod>) -> InGame {
+        InGame {
+            profile: profile.to_owned(),
+            mods: loaded
+                .into_iter()
+                .map(|found| format!("{} {}", found.id, found.version))
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Profiles {
     pub active: String,
     pub profiles: Vec<Profile>,
+    /// None until a profile is applied, and again once the mods are taken out.
+    #[serde(default, rename = "inGame", skip_serializing_if = "Option::is_none")]
+    pub in_game: Option<InGame>,
 }
 
 /// Marks and ranks `mods` the way a profile's entries say. Mods the entries do not name
@@ -102,6 +127,7 @@ impl Profiles {
                     name: DEFAULT_PROFILE.into(),
                     mods: first(),
                 }],
+                in_game: None,
             },
         }
     }
@@ -189,6 +215,9 @@ impl Profiles {
         profile.name = to.to_owned();
         if self.active == name {
             self.active = to.to_owned();
+        }
+        if let Some(in_game) = self.in_game.as_mut().filter(|given| given.profile == name) {
+            in_game.profile = to.to_owned();
         }
         Ok(())
     }
@@ -350,6 +379,31 @@ mod tests {
         let read = Profiles::load(&path, Vec::new);
         assert_eq!(read, profiles);
         assert_eq!(read.active().name, "Hard mode");
+        assert!(!fs::read_to_string(&path).unwrap().contains("inGame"));
+    }
+
+    #[test]
+    fn remembers_what_the_game_was_given() {
+        let (dir, mut mods) = three_mods();
+        apply(&mut mods, &[entry("cherry", true), entry("apple", true)]);
+        let order = mods::resolve(&mut mods, "gh-1");
+        let path = dir.path().join(PROFILES_NAME);
+        let mut profiles = Profiles::load(&path, Vec::new);
+        profiles.create("Second", vec![]).unwrap();
+        profiles.in_game = Some(InGame::new(
+            "Second",
+            order.iter().map(|&index| &mods[index]),
+        ));
+        profiles.save(&path).unwrap();
+        let mut read = Profiles::load(&path, Vec::new);
+        let given = read.in_game.clone().unwrap();
+        assert_eq!(given.mods, ["cherry 1.0.0", "apple 1.0.0"]);
+
+        // the record follows its profile's name, and only that
+        read.rename(DEFAULT_PROFILE, "Main").unwrap();
+        assert_eq!(read.in_game.as_ref().unwrap().profile, "Second");
+        read.rename("Second", "Third").unwrap();
+        assert_eq!(read.in_game.unwrap().profile, "Third");
     }
 
     #[test]

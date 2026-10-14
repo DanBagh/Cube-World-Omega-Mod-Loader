@@ -4,8 +4,10 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use cwoml_core::features;
 use cwoml_core::game::{self, DEFAULT_CHANNEL};
+use cwoml_core::loader;
 use cwoml_core::mods::{self, Mod, Notice};
-use cwoml_core::profiles::{self, Entry, PROFILES_NAME, Profiles};
+use cwoml_core::profiles::{self, Entry, InGame, PROFILES_NAME, Profiles};
+use cwoml_core::report::Level;
 use serde::Serialize;
 use tauri::{Manager, State, WebviewWindowBuilder};
 
@@ -101,6 +103,52 @@ struct Imported {
     version: String,
     /// Version this import replaced, if it replaced one.
     previous: Option<String>,
+}
+
+/// Whether a profile can be applied to the game, and what the game folder holds in the
+/// loader's place.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LoaderStatus {
+    /// "absent", "installed", "outdated" or "foreign". None when that cannot be told.
+    state: Option<&'static str>,
+    /// What the game starts with, while the loader is in it and that is on record.
+    in_game: Option<InGame>,
+    /// The Wollay Launcher was found, so it can be opened from here.
+    launcher: bool,
+    /// Why a profile cannot be applied, when it cannot.
+    blocked: Option<String>,
+}
+
+/// A kind of content that did not all fit the client this PC runs.
+#[derive(Serialize)]
+struct Short {
+    feature: &'static str,
+    planned: usize,
+    wanted: usize,
+}
+
+/// Something one of the applied mods has to say.
+#[derive(Serialize)]
+struct ModNote {
+    /// The mod's name.
+    name: String,
+    title: String,
+    /// The facts behind the title, on one line.
+    detail: String,
+}
+
+#[derive(Serialize)]
+struct Applied {
+    /// The profile whose mods the game now starts with.
+    profile: String,
+    release: String,
+    notes: Vec<ModNote>,
+    /// What a mod asked for that could not be done on the client this PC runs.
+    warnings: Vec<String>,
+    short: Vec<Short>,
+    /// How many more warnings only concern the client this PC does not run.
+    elsewhere: usize,
 }
 
 #[tauri::command]
@@ -328,6 +376,131 @@ fn delete_mod(paths: State<Paths>, id: String) -> Result<(), String> {
     .map(|_| ())
 }
 
+/// Notes what the game was given. None once the mods are taken out of it.
+fn record(paths: &Paths, in_game: Option<InGame>) -> Result<(), String> {
+    let mut profiles = read_profiles(paths)?;
+    profiles.in_game = in_game;
+    profiles.save(&paths.profiles()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn loader_status(paths: State<Paths>) -> LoaderStatus {
+    let launcher = loader::official_launcher().is_some();
+    let blocked = |why: String| LoaderStatus {
+        state: None,
+        in_game: None,
+        launcher,
+        blocked: Some(why),
+    };
+    let Some(dll) = loader::embedded() else {
+        return blocked(
+            "The part that runs inside the game is only built for Windows so far.".into(),
+        );
+    };
+    let game = match game::find(None, DEFAULT_CHANNEL) {
+        Ok(game) => game,
+        Err(reason) => return blocked(reason.to_string()),
+    };
+    let (state, blocked) = match loader::state(&game.root, dll) {
+        loader::State::Absent => ("absent", None),
+        loader::State::Installed { current: true } => ("installed", None),
+        loader::State::Installed { current: false } => ("outdated", None),
+        loader::State::Foreign => (
+            "foreign",
+            Some(format!(
+                "The game folder has a {} that this app did not put there.",
+                loader::DLL_NAME
+            )),
+        ),
+    };
+    // the folder decides: a game update leaves the loader behind, whatever is on record
+    let in_game = matches!(state, "installed" | "outdated")
+        .then(|| read_profiles(&paths).ok()?.in_game)
+        .flatten();
+    LoaderStatus {
+        state: Some(state),
+        in_game,
+        launcher,
+        blocked,
+    }
+}
+
+/// Plans the active profile's mods and puts the loader into the game folder, so the game
+/// starts with them. Starting the game stays with the Wollay Launcher.
+// not on the main thread: analysing the client takes a few seconds
+#[tauri::command(async)]
+fn apply_profile(paths: State<Paths>) -> Result<Applied, String> {
+    let game = game::find(None, DEFAULT_CHANNEL).map_err(|e| e.to_string())?;
+    let profiles = read_profiles(&paths)?;
+    let mut found = mods::load(&paths.mods());
+    profiles::apply(&mut found, &profiles.active().mods);
+    let build = loader::apply(&game, &mut found, &paths.data).map_err(|e| e.to_string())?;
+    let name = &profiles.active().name;
+    let loaded = build.order.iter().map(|&index| &found[index]);
+    record(&paths, Some(InGame::new(name, loaded)))?;
+    let client = game.client();
+    let (here, elsewhere): (Vec<_>, Vec<_>) = build
+        .report
+        .lines
+        .iter()
+        .filter(|line| line.level == Level::Warning)
+        .partition(|line| line.client.is_none() || line.client == client);
+    let notes = build
+        .order
+        .iter()
+        .flat_map(|&index| {
+            let applied = &found[index];
+            applied.warnings.iter().map(|notice| ModNote {
+                name: applied.name.clone(),
+                title: notice.title.clone(),
+                detail: notice.to_string(),
+            })
+        })
+        .collect();
+    Ok(Applied {
+        profile: name.clone(),
+        release: game.release,
+        notes,
+        // every such line starts by naming its client, which says nothing to a player
+        warnings: here
+            .iter()
+            .map(|line| {
+                let named = line.client.map(|client| format!("{}: ", client.key()));
+                let text = named.and_then(|prefix| line.text.strip_prefix(&prefix));
+                text.unwrap_or(&line.text).to_owned()
+            })
+            .collect(),
+        short: build
+            .tallies
+            .iter()
+            .filter(|tally| Some(tally.backend) == client && tally.planned < tally.wanted)
+            .map(|tally| Short {
+                feature: tally.feature,
+                planned: tally.planned,
+                wanted: tally.wanted,
+            })
+            .collect(),
+        elsewhere: elsewhere.len(),
+    })
+}
+
+/// Opens the Wollay Launcher, the only program that can start the game signed in.
+#[tauri::command]
+fn open_wollay_launcher() -> Result<(), String> {
+    let exe =
+        loader::official_launcher().ok_or("The Wollay Launcher was not found on this computer.")?;
+    loader::open_apart(&exe).map_err(|e| e.to_string())
+}
+
+/// Takes the loader out of the game folder. False if it was not there.
+#[tauri::command]
+fn remove_loader(paths: State<Paths>) -> Result<bool, String> {
+    let game = game::find(None, DEFAULT_CHANNEL).map_err(|e| e.to_string())?;
+    let removed = loader::clear(&game, &paths.data).map_err(|e| e.to_string())?;
+    record(&paths, None)?;
+    Ok(removed)
+}
+
 // portable: data sits beside the launcher, falling back to the per-user dir
 fn data_dir(app: &tauri::AppHandle) -> PathBuf {
     // a .app bundle must not be written into
@@ -379,7 +552,11 @@ pub fn run() {
             delete_profile,
             inspect_mod,
             import_mod,
-            delete_mod
+            delete_mod,
+            loader_status,
+            apply_profile,
+            open_wollay_launcher,
+            remove_loader
         ])
         .run(tauri::generate_context!())
         .expect("failed to run app");
