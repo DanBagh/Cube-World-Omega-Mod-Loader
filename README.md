@@ -2,16 +2,43 @@
 
 A mod manager for Cube World Omega.
 
-> [!INFO]
+> [!NOTE]
 > This loader only applies a collection of mods to the game. You still start the game from the Wollay Launcher itself.
 
 Goals:
 
 - OS agnostic (CWO currently builds for Windows but I believe can run on Linux with some effort)
 - preferably portable: no installer, and nothing for players to have to install. download and run. need to figure out the best placement for the data folder.
-- supporting plain dll injection but implement a preferable data-driven approach for better mod compatibility and management with custom schema (in Rust).
+- a data-driven approach for better mod compatibility and management with custom schema (in Rust). No DLL mods, for safety. Scripting in Luau may come later.
 
 Tech Stack: Tauri 2, Vue 3, TypeScript, Vite, Tailwind CSS and Reka UI.
+
+## Using it
+
+Windows only for now.
+
+1. Download `cwoml_<version>_windows_x64.exe` from the
+   [latest release](https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/releases/latest) and put it in a folder of its
+   own. It keeps its data in a `cwoml-data` folder beside it.
+2. Start it. The app is not signed yet, so Windows may say it is
+   unrecognised: choose More info, then Run anyway.
+3. Import mods from Manage mods, or drop `.zip` files on the window. The
+   example mods are attached to each release.
+4. Turn on the mods you want, then press Apply (Enable mods while mods are
+   off).
+5. Start the game from the Wollay Launcher as usual.
+
+Disable mods takes them out of the game again. After a game update the mods
+show as off: press Enable mods once more. The game changes often, and what a
+mod needs may have moved. The Apply dialog lists anything that could not be
+applied.
+
+Some antivirus programs may object to the DLL the loader puts into the game
+folder (see [Applying a profile](#applying-a-profile)).
+
+If something goes wrong, open an [issue](https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/issues) with what the Apply
+dialog said and `cwoml-data/loader.log`, which is written each time the game
+starts.
 
 ## Contributor/Developer Setup
 
