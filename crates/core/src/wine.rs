@@ -143,6 +143,20 @@ mod tests {
     }
 
     #[test]
+    fn finds_the_game_of_a_non_steam_game_under_proton() {
+        // the players' setup: the installer added to Steam, the launcher installed beside
+        let home = tempfile::tempdir().unwrap();
+        let prefix = home
+            .path()
+            .join(".steam/steam/steamapps/compatdata/4137892324/pfx");
+        let found = launcher(&prefix, "steamuser", 0);
+        let installed = found.with_file_name("Wollay Launcher");
+        fs::create_dir_all(&installed).unwrap();
+        File::create(installed.join("wollay-launcher.exe")).unwrap();
+        assert_eq!(find(home.path(), None), Some(found));
+    }
+
+    #[test]
     fn host_paths_are_on_drive_z() {
         assert_eq!(
             on_drive_z("/home/dan/cwoml-data/mods/a b.wav"),
