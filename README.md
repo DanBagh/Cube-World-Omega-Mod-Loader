@@ -46,21 +46,22 @@ starts.
 
 ### On Linux
 
-Download `CWOML_<version>_linux.AppImage`, make it executable and start it.
-It keeps its data in a `cwoml-data` folder beside the AppImage.
+Players run the game under Proton: the Wollay Launcher's installer added to
+Steam as a non-Steam game with Proton-GE, and that game's target then set to
+`wollay-launcher.exe` in its prefix. For the mods:
 
-The app looks for the Wollay Launcher in the Wine prefix that `WINEPREFIX`
-names, else in the prefixes Wine, Steam, Lutris, Heroic and Bottles make by
-default, and takes the one that installed the game last.
+1. Download `CWOML_<version>_linux.AppImage` to a folder inside your home
+   folder, make it executable and start it. It keeps its data in a
+   `cwoml-data` folder beside it. Proton runs the game in a container that
+   may not see files outside the home folder.
+2. In Steam, open the Wollay Launcher's Properties and set its launch
+   options to `WINEDLLOVERRIDES="dbghelp=n,b" %command%`. Without it Wine uses
+   its own `dbghelp.dll` and the mods do not load.
+3. Press Apply in the app, then start the Wollay Launcher from Steam.
 
-Wine uses its own `dbghelp.dll` unless told otherwise, so the game only loads
-the mods with a DLL override, set once wherever the Wollay Launcher is
-started from:
-
-- Steam: launch options `WINEDLLOVERRIDES="dbghelp=n,b" %command%`
-- Lutris: Runner options, DLL overrides: `dbghelp` with the value `n,b`
-- Bottles: Settings, DLL overrides: `dbghelp` as native, then builtin
-- Wine itself: start the launcher with `WINEDLLOVERRIDES="dbghelp=n,b"`
+The app finds the game in Steam's prefixes by itself, and also looks in the
+prefix `WINEPREFIX` names and the ones Wine, Lutris, Heroic and Bottles make
+by default. Those need the same override: `dbghelp` as native, then builtin.
 
 ## Contributor/Developer Setup
 
