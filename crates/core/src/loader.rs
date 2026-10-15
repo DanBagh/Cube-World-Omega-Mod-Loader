@@ -217,8 +217,9 @@ mod tests {
         install(&game, &old, &home).unwrap();
         assert_eq!(state(&game, &old), State::Installed { current: true });
         assert_eq!(state(&game, &new), State::Installed { current: false });
+        // the folder as the game opens it, on drive Z: under Wine
         let pointer = fs::read_to_string(game.join(HOME_FILE)).unwrap();
-        assert_eq!(pointer.trim_end(), home.display().to_string());
+        assert_eq!(pointer.trim_end(), wine::game_path(&home));
 
         install(&game, &new, &home).unwrap();
         assert_eq!(fs::read(game.join(DLL_NAME)).unwrap(), new);
