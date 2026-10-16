@@ -1,62 +1,79 @@
 //! The item-model trampoline, for `ground_models`.
 //!
-//! The client loads the model of an ordinary item in a background job. That load is
-//! diverted to open another file for the made-up subtypes that stand for an amount on the
-//! ground.
+//! The client fetches the model of every item through one function, handing it the item
+//! and the model file to load. Since game 0.1.2 it keeps one model per file, so items
+//! that are to look different need files of their own before that. For the made-up
+//! subtypes that stand for an amount on the ground, the start of that function puts in
+//! the entry's file.
 //!
-//! Build-specific: the job is found by its instructions.
+//! Build-specific: the function is the one model_of_item calls with the coin's file, and
+//! where it keeps the file name's length is read from its code.
 
 use super::ModuleBuild;
-use super::ground_models::GroundModel;
-use super::stub::{ANY, CLIENT, RETURN, Stub, i32_at, signature};
+use super::ground_models::{GroundModel, coin_named};
+use super::stub::{ANY, RETURN, Stub, i32_at, signature};
 use crate::plan::{BLOB_PAD, Claim, Group, Op};
 use crate::report::Report;
 
 /// Id of the plan group that installs the trampoline.
 pub const GROUP: &str = "item-models";
 
-// add rdi,10h / mov [rsp+N],rdi / mov [rsp+M],rax / lea rdx,[rsp+N] / mov rcx,rsi, then
-// the replaced xor r8d,r8d / call load_cub / jmp finished
-const SITE: &str = r"\x48\x83\xc7\x10\x48\x89\x7c\x24(.)\x48\x89\x44\x24.\x48\x8d\x54\x24(.)\x48\x89\xf1(\x45\x31\xc0\xe8(....)\xe9(....))";
-// mov ecx,[rdi+<item type>] / cmp ecx,imm32, earlier in the job, before rdi is advanced
-const ITEM: &str = r"\x8b\x8f(....)\x81\xf9";
+// lea r9,[rbp+N]: the model file, handed on after the coin's is put together
+const FILE_ARGUMENT: &str = r"\x4c\x8d(?:\x4d.|\x8d....)";
+/// push rbp / push r15 / push r14: the start of the function, which the hook replaces.
+const PROLOGUE: [u8; 5] = [0x55, 0x41, 0x57, 0x41, 0x56];
+// mov REG,r9: the model file, kept
+const KEPT: &str = r"([\x4c\x4d])\x89([\xc8-\xcf])";
+// mov or cmp of 64 bits at [REG+N]: the length of its name. The avx2 client reads it into
+// rax, the baseline one compares it in place
+const LENGTH: &str = r"([\x48-\x4f])[\x8b\x39\x3b]([\x80-\xbf])(....)";
+/// How far behind the coin's file name the call is looked for.
+const AFTER: usize = 0x40;
+/// How far into the function the length is looked for.
+const BODY: usize = 0x400;
 // asm/item_model.asm
-pub(super) const STUB: &str = "4c8d0d00000000418b0183f8ff74263b87222222227518418b41043b8733333333750c496341084903c1488902\
-eb064983c10cebd24533c0e8cccccccce9dddddddd";
+pub(super) const STUB: &str = "4c8d1500000000418b0283f8ff743b413b007530418b4204413b40047526496342084903c24533db460fb61418\
+478814194585d2740549ffc3ebed4d899955555555eb064983c20cebbd5541574156e9dddddddd";
 
 struct Hook {
+    /// The function every model is fetched through.
     site: u32,
-    expect: Vec<u8>,
-    /// The client's .cub loader, which the replaced call goes to.
-    loader: u32,
-    /// Where the replaced jmp goes.
-    finished: u32,
-    /// Where the job keeps the item type, from rdi as it is at the hook.
-    item: i32,
+    /// Where the file it is handed keeps the length of its name, and so how long a name
+    /// can be.
+    length: i32,
+}
+
+/// A register from a REX prefix's B bit and the low bits of a ModRM byte.
+fn register(rex: u8, modrm: u8) -> u8 {
+    (modrm & 7) | ((rex & 1) << 3)
 }
 
 fn find_hook(module: &ModuleBuild) -> Option<Hook> {
     let image = module.image;
     let (text_va, text) = image.data(".text")?;
-    let site = signature(SITE);
-    // both moves use the same stack slot
-    let mut sites = site.captures_iter(text).filter(|hit| hit[1] == hit[2]);
-    let hit = sites.next()?;
-    if sites.next().is_some() {
-        return None;
-    }
-    let replaced = hit.get(3)?;
-    let at = text_va + replaced.start() as u32;
-    let job = image.function_start(text_va + hit.get(0)?.start() as u32)?;
-    let before = text.get((job.checked_sub(text_va)?) as usize..hit.get(0)?.start())?;
-    let item = signature(ITEM).captures(before)?;
-    Some(Hook {
-        site: at,
-        expect: replaced.as_bytes().to_vec(),
-        loader: (at + 8).wrapping_add_signed(i32_at(&hit[4], 0)),
-        finished: (at + 13).wrapping_add_signed(i32_at(&hit[5], 0)),
-        item: i32_at(&item[1], 0) - 0x10,
-    })
+    let named = coin_named(module)?.checked_sub(text_va)? as usize;
+    let window = text.get(named..text.len().min(named + AFTER))?;
+    let handed = signature(FILE_ARGUMENT).find(window)?.end();
+    // the first call after it that goes to a function starting the expected way
+    let site = (handed..window.len().saturating_sub(4))
+        .filter(|&at| window[at] == 0xE8)
+        .map(|at| (text_va + (named + at) as u32 + 5).wrapping_add_signed(i32_at(window, at + 1)))
+        .find(|&target| {
+            image.function_start(target) == Some(target)
+                && image.read(target, PROLOGUE.len()) == Some(&PROLOGUE[..])
+        })?;
+    let start = (site - text_va) as usize;
+    let body = text.get(start..text.len().min(start + BODY))?;
+    let kept = signature(KEPT).captures(body)?;
+    let reg = register(kept[1][0], kept[2][0]);
+    let after = &body[kept.get(0)?.end()..];
+    let read = signature(LENGTH)
+        .captures_iter(after)
+        .find(|hit| register(hit[1][0], hit[2][0]) == reg && hit[2][0] & 7 != 4)?;
+    let length = i32_at(&read[3], 0);
+    (0x10..=0x400)
+        .contains(&length)
+        .then_some(Hook { site, length })
 }
 
 /// Installs the trampoline for one client DLL. False if there was nothing to install or
@@ -65,17 +82,24 @@ pub fn plan(module: &mut ModuleBuild, models: &[GroundModel], report: &mut Repor
     if models.is_empty() {
         return false;
     }
+    let backend = module.backend.key();
     let Some(hook) = find_hook(module) else {
         report.warn(format!(
-            "{}: could not locate the item model loader in this build; models by amount skipped",
-            module.backend.key()
+            "{backend}: could not locate where the client fetches item models in this build; models by amount skipped"
         ));
         return false;
     };
+    // a name and its end must fit in front of the length
+    if let Some(long) = models.iter().find(|m| m.name.len() >= hook.length as usize) {
+        report.warn(format!(
+            "{backend}: the model file name {} is longer than this build allows; models by amount skipped",
+            long.name
+        ));
+        return false;
+    }
     let mut stub = Stub::new(STUB);
-    stub.fill(0x22, hook.item);
-    stub.fill(0x33, hook.item + 4);
-    // after the code: the table, then the model paths
+    stub.fill(0x55, hook.length);
+    // after the code: the table, then the model file names
     let table_at = stub.size();
     let paths_at = table_at + 12 * models.len() + 4;
     let (mut table, mut paths) = (Vec::new(), Vec::new());
@@ -88,8 +112,8 @@ pub fn plan(module: &mut ModuleBuild, models: &[GroundModel], report: &mut Repor
         paths.push(0);
     }
     table.extend_from_slice(&ANY.to_le_bytes());
-    stub.lea([0x4C, 0x8D, 0x0D], 0, table_at);
-    let (loader, resume) = (stub.at(CLIENT), stub.at(RETURN));
+    stub.lea([0x4C, 0x8D, 0x15], 0, table_at);
+    let resume = stub.at(RETURN);
 
     let start = module.plan.reserve();
     let blob = &mut module.plan.blob;
@@ -98,9 +122,10 @@ pub fn plan(module: &mut ModuleBuild, models: &[GroundModel], report: &mut Repor
     blob.extend(paths);
     blob.resize(blob.len() + BLOB_PAD, 0);
 
+    let end = hook.site + PROLOGUE.len() as u32;
     module.plan.claims.push(Claim {
         start: hook.site,
-        end: hook.site + hook.expect.len() as u32,
+        end,
         owner: "item models".into(),
     });
     let mut who: Vec<&str> = Vec::new();
@@ -118,16 +143,12 @@ pub fn plan(module: &mut ModuleBuild, models: &[GroundModel], report: &mut Repor
         ),
         ops: vec![
             Op::BlobRel32 {
-                blob_offset: start + loader,
-                target: hook.loader,
-            },
-            Op::BlobRel32 {
                 blob_offset: start + resume,
-                target: hook.finished,
+                target: end,
             },
             Op::Hook {
                 rva: hook.site,
-                expect: hook.expect,
+                expect: PROLOGUE.to_vec(),
                 blob_offset: start,
             },
         ],
@@ -144,65 +165,61 @@ mod tests {
     use crate::refs::RefIndex;
     use crate::testing::TinyPe;
 
-    struct Client {
-        pe: TinyPe,
-        site: u32,
-        loader: u32,
-        finished: u32,
+    /// A client with the function every model is fetched through, and model_of_item
+    /// calling it with the coin's file, the way game 0.1.2 has them. `kept` is the
+    /// `mov REG,r9` and `read` the `mov rax,[REG+80h]` of the build. Returns the client and
+    /// the function.
+    fn client(kept: [u8; 3], read: [u8; 3]) -> (TinyPe, u32) {
+        let mut pe = TinyPe::new();
+        let fetch = pe.code(&[0x55, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x53]);
+        pe.code(&[0x48, 0x81, 0xEC, 0xF8, 3, 0, 0]);
+        pe.code(&kept);
+        pe.code(&[0x48, 0x89, 0xD6]);
+        pe.code(&read);
+        pe.code(&[0x80, 0, 0, 0]);
+        let end = pe.code(&[0xC3]);
+        pe.function(fetch, end + 1);
+        // something that puts the file together, and does not start like the function
+        let build = pe.code(&[0x48, 0x89, 0xC8, 0xC3]);
+        pe.function(build, build + 4);
+
+        let name = pe.rdata(b"sprites/gold-coin.cub\0");
+        let lookup = pe.code(&[0x55, 0x48, 0x89, 0xE5]);
+        pe.rip_relative(&[0x48, 0x8D, 0x15], name);
+        pe.code(&[0x48, 0x8D, 0x4D, 0xB0]);
+        let call = pe.code(&[0xE8, 0, 0, 0, 0]);
+        pe.patch(call + 1, &build.wrapping_sub(call + 5).to_le_bytes());
+        pe.code(&[0x4C, 0x89, 0x74, 0x24, 0x20, 0x4C, 0x8D, 0x4D, 0xB0]);
+        pe.code(&[0x48, 0x89, 0xD9, 0x48, 0x89, 0xF2, 0x49, 0x89, 0xF8]);
+        let call = pe.code(&[0xE8, 0, 0, 0, 0]);
+        pe.patch(call + 1, &fetch.wrapping_sub(call + 5).to_le_bytes());
+        let end = pe.code(&[0xC3]);
+        pe.function(lookup, end + 1);
+        (pe, fetch)
     }
 
-    /// A client with the item job. `slot` is the stack slot the job uses, which moved
-    /// between releases.
-    fn client(slot: u8) -> Client {
-        let mut pe = TinyPe::new();
-        let loader = pe.code(&[0x55, 0x56, 0x57, 0xC3]);
-        pe.function(loader, loader + 4);
-
-        let job = pe.code(&[0x48, 0x89, 0xCF]);
-        pe.code(&[0x8B, 0x8F, 0xAC, 0, 0, 0, 0x81, 0xF9, 0x82, 0, 0, 0]);
-        pe.code(&[0x90; 8]);
-        pe.code(&[0x48, 0x83, 0xC7, 0x10, 0x48, 0x89, 0x7C, 0x24, slot]);
-        pe.code(&[
-            0x48,
-            0x89,
-            0x44,
-            0x24,
-            slot + 8,
-            0x48,
-            0x8D,
-            0x54,
-            0x24,
-            slot,
-        ]);
-        pe.code(&[0x48, 0x89, 0xF1]);
-        let site = pe.code(&[0x45, 0x31, 0xC0]);
-        let call = pe.code(&[0xE8, 0, 0, 0, 0]);
-        let jump = pe.code(&[0xE9, 0, 0, 0, 0]);
-        pe.code(&[0x90; 24]);
-        let finished = pe.code(&[0xC3]);
-        pe.function(job, finished + 1);
-        pe.patch(call + 1, &loader.wrapping_sub(call + 5).to_le_bytes());
-        pe.patch(jump + 1, &finished.wrapping_sub(jump + 5).to_le_bytes());
-        Client {
-            pe,
-            site,
-            loader,
-            finished,
+    fn module<'a>(image: &'a crate::pe::PeImage, refs: &'a RefIndex) -> ModuleBuild<'a> {
+        ModuleBuild {
+            backend: Backend::Avx2,
+            image,
+            refs,
+            plan: ModulePlan::new(Backend::Avx2, image.timestamp, image.size_of_image),
         }
     }
 
     #[test]
-    fn installs_the_table_and_makes_the_replaced_call() {
-        for slot in [0x48, 0x38] {
-            let client = client(slot);
-            let image = client.pe.build();
+    fn puts_the_entrys_file_in_before_the_client_looks_it_up() {
+        // mov r15,r9 / mov rax,[r15+80h] in the avx2 client of game 0.1.2,
+        // mov rbx,r9 / mov rax,[rbx+80h] before, and cmp [r15+80h],rax in the baseline one
+        for (kept, read) in [
+            ([0x4D, 0x89, 0xCF], [0x49, 0x8B, 0x87]),
+            ([0x4C, 0x89, 0xCB], [0x48, 0x8B, 0x83]),
+            ([0x4D, 0x89, 0xCF], [0x49, 0x39, 0x87]),
+        ] {
+            let (pe, fetch) = client(kept, read);
+            let image = pe.build();
             let refs = RefIndex::build(&image).unwrap();
-            let mut module = ModuleBuild {
-                backend: Backend::Avx2,
-                image: &image,
-                refs: &refs,
-                plan: ModulePlan::new(Backend::Avx2, image.timestamp, image.size_of_image),
-            };
+            let mut module = module(&image, &refs);
             let models = [model(43, 20, "rupees"), model(43, 5, "other")];
             let mut report = Report::default();
             assert!(plan(&mut module, &models, &mut report));
@@ -215,34 +232,27 @@ mod tests {
                 rva,
                 expect,
                 blob_offset: start,
-            } = &group.ops[2]
+            } = &group.ops[1]
             else {
                 panic!("the hook comes last")
             };
-            assert_eq!((*rva, expect.len()), (client.site, 13));
+            assert_eq!((*rva, &expect[..]), (fetch, &PROLOGUE[..]));
             let stub = Stub::new(STUB);
             assert_eq!(
-                group.ops[..2],
-                [
-                    Op::BlobRel32 {
-                        blob_offset: start + stub.at(CLIENT),
-                        target: client.loader
-                    },
-                    Op::BlobRel32 {
-                        blob_offset: start + stub.at(RETURN),
-                        target: client.finished
-                    },
-                ]
+                group.ops[0],
+                Op::BlobRel32 {
+                    blob_offset: start + stub.at(RETURN),
+                    target: fetch + 5
+                }
             );
             assert_eq!(plan.data_size, 0);
 
             let blob = &plan.blob;
             let code = *start as usize;
-            let filled = |marker: u8| i32_at(blob, code + stub.at(marker) as usize);
-            assert_eq!((filled(0x22), filled(0x33)), (0x9C, 0xA0));
-            // xor r8d,r8d right before the call, as the client has it
-            let call = code + stub.at(CLIENT) as usize - 1;
-            assert_eq!(blob[call - 3..call], [0x45, 0x33, 0xC0]);
+            assert_eq!(i32_at(blob, code + stub.at(0x55) as usize), 0x80);
+            // the replaced instructions, right before the jump back
+            let jump = code + stub.at(RETURN) as usize - 1;
+            assert_eq!(blob[jump - 5..jump], PROLOGUE);
             // the table: the subtype for 20 or more, and its file
             let table = code + stub.size();
             assert_eq!(
@@ -256,17 +266,12 @@ mod tests {
     }
 
     #[test]
-    fn a_build_without_the_job_is_skipped_and_reported() {
+    fn a_build_without_the_function_is_skipped_and_reported() {
         let mut pe = TinyPe::new();
         pe.code(&[0x90; 64]);
         let image = pe.build();
         let refs = RefIndex::build(&image).unwrap();
-        let mut module = ModuleBuild {
-            backend: Backend::Baseline,
-            image: &image,
-            refs: &refs,
-            plan: ModulePlan::new(Backend::Baseline, image.timestamp, image.size_of_image),
-        };
+        let mut module = module(&image, &refs);
         let mut report = Report::default();
         assert!(!plan(&mut module, &[model(43, 5, "a")], &mut report));
         assert!(!plan(&mut module, &[], &mut report));

@@ -11,6 +11,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A modding guide, in `docs/` and built into the app: Modding guide, in the
   footer. Links in it to web pages open in the browser.
 
+### Fixed
+
+- Models by amount on game 0.1.2: every pile of an item showed the model of the
+  first pile the game loaded. The Rupees example shows the right colour for
+  each amount again.
+
 ### Removed
 
 - `"enabled": false` in a `mod.json` no longer turns a mod off. Profiles do

@@ -1,11 +1,11 @@
 //! Models by amount: the `"groundModels"` manifest section.
 //!
 //! A gold coin on the ground is the same item whether it is worth 1 or 500. Only the
-//! amount behind it in the ground record differs, so every coin looks alike. The client
-//! keeps one model per distinct item, so where it fetches the model of an item on the
-//! ground it is handed a copy of the item with a subtype no real item has, standing for
-//! "this many or more". `item_models` loads the entry's file for that subtype, and the
-//! in-game loader serves the file under a name of its own.
+//! amount behind it in the ground record differs, so every coin looks alike. Where the
+//! client fetches the model of an item on the ground, it is handed a copy of the item with
+//! a subtype no real item has, standing for "this many or more". `item_models` gives that
+//! subtype the entry's file, and the in-game loader serves the file under a name of its
+//! own.
 //!
 //! Build-specific: the call is found from the code that compares ground records. The two
 //! clients keep the record in different registers, so the signatures name none.
@@ -151,15 +151,16 @@ struct Hook {
     lookup: u32,
 }
 
+/// Where model_of_item, the function that names the model files, names the coin's.
+pub(super) fn coin_named(module: &ModuleBuild) -> Option<u32> {
+    let sites = string_sites(module.image, module.refs, b"sprites/gold-coin.cub");
+    let lea = sites.values().flatten().find(|s| s.kind == SiteKind::Lea)?;
+    Some(lea.rva)
+}
+
 fn find_hook(module: &ModuleBuild) -> Option<Hook> {
     let (text_va, text) = module.image.data(".text")?;
-    // model_of_item is the function that names the model files
-    let named = string_sites(module.image, module.refs, b"sprites/gold-coin.cub")
-        .values()
-        .flatten()
-        .find(|s| s.kind == SiteKind::Lea)?
-        .rva;
-    let lookup = module.image.function_start(named)?;
+    let lookup = module.image.function_start(coin_named(module)?)?;
     // a register from an optional REX.B prefix and the low bits of a ModRM byte
     let register = |rex: &[u8], modrm: &[u8]| (modrm[0] & 7) | (u8::from(!rex.is_empty()) << 3);
     let (record, field) = (signature(RECORD), signature(FIELD));
