@@ -197,6 +197,12 @@ Profiles are in `cwoml-data/profiles.json`. A profile lists the mods added to
 it, which of them are on, and their order. A new profile starts empty or as a
 copy of another one.
 
+## Making mods
+
+The [modding guide](docs/README.md) explains how to make a mod and everything
+a `mod.json` can hold. The app has the same guide built in: Modding guide, in
+its footer. It is built from `docs/`, so a change there shows up in both.
+
 ## Example mods
 
 `example_mods/` has two mods made for this loader. They also show what a

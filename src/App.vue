@@ -24,6 +24,7 @@ import {
   type ProfileState,
 } from "./api"
 import AppliedDialog from "./components/AppliedDialog.vue"
+import GuideDialog from "./components/GuideDialog.vue"
 import ConfirmDialog, { type Question } from "./components/ConfirmDialog.vue"
 import LibraryDialog from "./components/LibraryDialog.vue"
 import ModCard from "./components/ModCard.vue"
@@ -56,6 +57,7 @@ const applying = ref(false)
 const applied = ref<Applied>()
 
 const browsing = ref(false)
+const guide = ref(false)
 const creating = ref(false)
 const renaming = ref(false)
 const question = ref<Question>()
@@ -542,7 +544,14 @@ onUnmounted(() => stopListening())
         Currently Running:
         {{ standing === "off" ? "no mods" : (given ?? "other mods") }}
       </span>
-      <span class="ml-auto truncate" :title="game?.release">
+      <button
+        class="ml-auto cursor-pointer hover:text-ink hover:underline"
+        title="How to make mods"
+        @click="guide = true"
+      >
+        Modding guide
+      </button>
+      <span class="truncate" :title="game?.release">
         Cube World Omega
         {{
           game
@@ -579,6 +588,7 @@ onUnmounted(() => stopListening())
       @close="applied = undefined"
       @launcher="openWollayLauncher"
     />
+    <GuideDialog v-model:open="guide" />
     <ConfirmDialog :question="question" @answer="answer" />
   </div>
 </template>

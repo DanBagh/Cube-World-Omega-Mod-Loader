@@ -78,4 +78,81 @@
   .dialog {
     @apply fixed top-1/2 left-1/2 w-96 max-w-[90vw] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line bg-surface p-5 shadow-lg;
   }
+
+  /* a page of the guide, rendered from markdown */
+  .doc {
+    @apply text-sm leading-relaxed;
+  }
+
+  .doc h1 {
+    @apply mb-3 text-xl font-semibold;
+  }
+
+  .doc h2 {
+    @apply mt-7 mb-2 border-b border-line pb-1 text-lg font-semibold;
+  }
+
+  .doc h3 {
+    @apply mt-5 mb-2 font-semibold;
+  }
+
+  .doc h4 {
+    @apply mt-4 mb-1 font-semibold;
+  }
+
+  .doc :is(p, ul, ol, pre, table, blockquote) {
+    @apply my-3;
+  }
+
+  .doc ul {
+    @apply list-disc pl-6;
+  }
+
+  .doc ol {
+    @apply list-decimal pl-6;
+  }
+
+  .doc li + li {
+    @apply mt-1;
+  }
+
+  .doc a {
+    @apply cursor-pointer text-accent underline-offset-2 hover:underline;
+  }
+
+  .doc code {
+    @apply rounded bg-canvas px-1 py-0.5 font-mono text-[0.9em];
+  }
+
+  .doc pre {
+    @apply overflow-auto rounded-md border border-line bg-canvas p-3;
+  }
+
+  .doc pre code {
+    @apply bg-transparent p-0;
+  }
+
+  .doc table {
+    @apply block overflow-auto;
+  }
+
+  .doc :is(th, td) {
+    @apply border border-line px-2 py-1 text-left align-top;
+  }
+
+  .doc th {
+    @apply bg-canvas font-semibold;
+  }
+
+  .doc blockquote {
+    @apply border-l-4 border-line pl-3 text-muted;
+  }
+
+  .doc img {
+    @apply max-w-full rounded-md;
+  }
+
+  .doc hr {
+    @apply my-6 border-line;
+  }
 }

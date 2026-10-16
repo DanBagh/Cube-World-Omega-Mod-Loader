@@ -514,6 +514,19 @@ fn open_wollay_launcher() -> Result<(), String> {
 /// Opens the page of the newest release in the browser.
 #[tauri::command]
 fn open_releases() -> Result<(), String> {
+    browse(RELEASES)
+}
+
+/// Opens a link from the guide in the browser. Only web pages, over https.
+#[tauri::command]
+fn open_link(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err(format!("{url} is not a web page this app opens"));
+    }
+    browse(&url)
+}
+
+fn browse(url: &str) -> Result<(), String> {
     let opener = if cfg!(windows) {
         "explorer.exe"
     } else if cfg!(target_os = "macos") {
@@ -522,7 +535,7 @@ fn open_releases() -> Result<(), String> {
         "xdg-open"
     };
     let mut child = std::process::Command::new(opener)
-        .arg(RELEASES)
+        .arg(url)
         .spawn()
         .map_err(|e| format!("{opener}: {e}"))?;
     // waited for, so it does not linger once it has handed the page to the browser
@@ -595,6 +608,7 @@ pub fn run() {
             apply_profile,
             open_wollay_launcher,
             open_releases,
+            open_link,
             remove_loader
         ])
         .run(tauri::generate_context!())

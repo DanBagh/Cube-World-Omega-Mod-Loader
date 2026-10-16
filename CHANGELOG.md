@@ -6,6 +6,11 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- A modding guide, in `docs/` and built into the app: Modding guide, in the
+  footer. Links in it to web pages open in the browser.
+
 ### Removed
 
 - `"enabled": false` in a `mod.json` no longer turns a mod off. Profiles do

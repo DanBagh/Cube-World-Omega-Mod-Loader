@@ -149,6 +149,7 @@ export const api = {
   applyProfile: () => invoke<Applied>("apply_profile"),
   openWollayLauncher: () => invoke<void>("open_wollay_launcher"),
   openReleases: () => invoke<void>("open_releases"),
+  openLink: (url: string) => invoke<void>("open_link", { url }),
   removeLoader: () => invoke<boolean>("remove_loader"),
 }
 
