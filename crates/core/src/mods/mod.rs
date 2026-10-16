@@ -188,9 +188,6 @@ pub fn load(mods_dir: &Path) -> Vec<Mod> {
                             .push(Notice::new("Invalid priority").with("Expected", "an integer")),
                     },
                 }
-                if manifest.get("enabled") == Some(&Value::Bool(false)) {
-                    found.errors.push(Notice::new("Disabled in its manifest"));
-                }
                 found.manifest = manifest;
             }
         }
@@ -278,10 +275,8 @@ pub(crate) mod tests {
         );
         assert_eq!(by_folder("shouting").errors.len(), 2);
         assert_eq!(by_folder("shouting").id, "Shouting");
-        assert_eq!(
-            by_folder("off").errors,
-            [Notice::new("Disabled in its manifest")]
-        );
+        // a profile turns a mod off. The manifest's own "enabled" is not read any more
+        assert!(by_folder("off").active());
     }
 
     #[test]

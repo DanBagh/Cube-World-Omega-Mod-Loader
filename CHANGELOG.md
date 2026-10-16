@@ -6,6 +6,11 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+
+- `"enabled": false` in a `mod.json` no longer turns a mod off. Profiles do
+  that, and a mod folder whose name starts with `_` is left out.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added
