@@ -9,6 +9,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Pickup sounds on game 0.1.4, which copies the picked up item somewhere else.
+- Models by amount on the baseline client of game 0.1.4.
 
 ## [0.3.0] - 2026-10-16
 

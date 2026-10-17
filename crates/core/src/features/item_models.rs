@@ -6,8 +6,10 @@
 //! subtypes that stand for an amount on the ground, the start of that function puts in
 //! the entry's file.
 //!
-//! Build-specific: the function is the one model_of_item calls with the coin's file, and
-//! where it keeps the file name's length is read from its code.
+//! Build-specific: the function is the one model_of_item calls with the coin's file.
+//! Where the file keeps its name's length is read from model_of_item, which writes it for
+//! a file it puts together itself, and from the function, where it reads it. The baseline
+//! client of game 0.1.4 only has the first.
 
 use super::ModuleBuild;
 use super::ground_models::{GroundModel, coin_named};
@@ -27,8 +29,14 @@ const KEPT: &str = r"([\x4c\x4d])\x89([\xc8-\xcf])";
 // mov or cmp of 64 bits at [REG+N]: the length of its name. The avx2 client reads it into
 // rax, the baseline one compares it in place
 const LENGTH: &str = r"([\x48-\x4f])[\x8b\x39\x3b]([\x80-\xbf])(....)";
+// mov qword [rbp+L],imm32: the length of a file model_of_item puts together itself
+const LENGTH_STORE: &str = r"\x48\xc7(?:\x45(.)|\x85(....))....";
+// lea r9,[rbp+P]: that file, handed on
+const HANDED: &str = r"\x4c\x8d(?:\x4d(.)|\x8d(....))";
 /// How far behind the coin's file name the call is looked for.
 const AFTER: usize = 0x40;
+/// How much of model_of_item is looked through for files it puts together.
+const LOOKUP: usize = 0x2000;
 /// How far into the function the length is looked for.
 const BODY: usize = 0x400;
 // asm/item_model.asm
@@ -62,18 +70,54 @@ fn find_hook(module: &ModuleBuild) -> Option<Hook> {
             image.function_start(target) == Some(target)
                 && image.read(target, PROLOGUE.len()) == Some(&PROLOGUE[..])
         })?;
-    let start = (site - text_va) as usize;
-    let body = text.get(start..text.len().min(start + BODY))?;
+    let lookup = image.function_start(text_va + named as u32)?;
+    let length = match (
+        written(text, (lookup - text_va) as usize),
+        read(text, (site - text_va) as usize),
+    ) {
+        (Some(by_caller), Some(by_function)) if by_caller != by_function => return None,
+        (by_caller, by_function) => by_caller.or(by_function)?,
+    };
+    (0x10..=0x400)
+        .contains(&length)
+        .then_some(Hook { site, length })
+}
+
+/// A disp8 or disp32 that follows a ModRM byte, as captured.
+fn displacement(disp8: Option<regex::bytes::Match>, disp32: Option<regex::bytes::Match>) -> i32 {
+    match (disp8, disp32) {
+        (Some(byte), _) => i32::from(byte.as_bytes()[0] as i8),
+        (_, Some(word)) => i32_at(word.as_bytes(), 0),
+        _ => 0,
+    }
+}
+
+/// Where the length goes, as model_of_item at `lookup` writes it for a file it puts
+/// together itself: the distance from the file to the length. None if no file is, or if
+/// two disagree.
+fn written(text: &[u8], lookup: usize) -> Option<i32> {
+    let body = text.get(lookup..text.len().min(lookup + LOOKUP))?;
+    let (store, handed) = (signature(LENGTH_STORE), signature(HANDED));
+    let mut found = store.captures_iter(body).filter_map(|hit| {
+        let length = displacement(hit.get(1), hit.get(2));
+        let after = &body[hit.get(0)?.end()..body.len().min(hit.get(0)?.end() + 32)];
+        let file = handed.captures(after)?;
+        Some(length - displacement(file.get(1), file.get(2)))
+    });
+    let first = found.next()?;
+    found.all(|other| other == first).then_some(first)
+}
+
+/// Where the function at `site` reads the length from the file it is handed, if it does.
+fn read(text: &[u8], site: usize) -> Option<i32> {
+    let body = text.get(site..text.len().min(site + BODY))?;
     let kept = signature(KEPT).captures(body)?;
     let reg = register(kept[1][0], kept[2][0]);
     let after = &body[kept.get(0)?.end()..];
     let read = signature(LENGTH)
         .captures_iter(after)
         .find(|hit| register(hit[1][0], hit[2][0]) == reg && hit[2][0] & 7 != 4)?;
-    let length = i32_at(&read[3], 0);
-    (0x10..=0x400)
-        .contains(&length)
-        .then_some(Hook { site, length })
+    Some(i32_at(&read[3], 0))
 }
 
 /// Installs the trampoline for one client DLL. False if there was nothing to install or
@@ -170,6 +214,12 @@ mod tests {
     /// `mov REG,r9` and `read` the `mov rax,[REG+80h]` of the build. Returns the client and
     /// the function.
     fn client(kept: [u8; 3], read: [u8; 3]) -> (TinyPe, u32) {
+        client_writing(kept, read, None)
+    }
+
+    /// The same, where model_of_item also puts a file together itself first, writing its
+    /// length at [rbp+`written`] and handing it over at [rbp-50h].
+    fn client_writing(kept: [u8; 3], read: [u8; 3], written: Option<u8>) -> (TinyPe, u32) {
         let mut pe = TinyPe::new();
         let fetch = pe.code(&[0x55, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x53]);
         pe.code(&[0x48, 0x81, 0xEC, 0xF8, 3, 0, 0]);
@@ -185,6 +235,13 @@ mod tests {
 
         let name = pe.rdata(b"sprites/gold-coin.cub\0");
         let lookup = pe.code(&[0x55, 0x48, 0x89, 0xE5]);
+        if let Some(at) = written {
+            // mov qword [rbp+at],15h / mov rcx,rbx / lea r9,[rbp-50h] / call
+            pe.code(&[0x48, 0xC7, 0x45, at, 0x15, 0, 0, 0, 0x48, 0x89, 0xD9]);
+            pe.code(&[0x4C, 0x8D, 0x4D, 0xB0]);
+            let call = pe.code(&[0xE8, 0, 0, 0, 0]);
+            pe.patch(call + 1, &fetch.wrapping_sub(call + 5).to_le_bytes());
+        }
         pe.rip_relative(&[0x48, 0x8D, 0x15], name);
         pe.code(&[0x48, 0x8D, 0x4D, 0xB0]);
         let call = pe.code(&[0xE8, 0, 0, 0, 0]);
@@ -263,6 +320,25 @@ mod tests {
             assert!(blob[path..].starts_with(b"sprites/cwo-ground-0000000000000014.cub\0"));
             assert_eq!(i32_at(blob, table + 24), -1);
         }
+    }
+
+    #[test]
+    fn the_length_is_where_model_of_item_writes_it() {
+        let length = |read: [u8; 3], written: Option<u8>| {
+            let (pe, _) = client_writing([0x4D, 0x89, 0xCF], read, written);
+            let image = pe.build();
+            let refs = RefIndex::build(&image).unwrap();
+            find_hook(&module(&image, &refs)).map(|hook| hook.length)
+        };
+        // nothing in the function reads it, as in the baseline client of game 0.1.4
+        let nothing = [0x90, 0x90, 0x90];
+        assert_eq!(length(nothing, Some(0x30)), Some(0x80));
+        // both say where it is
+        assert_eq!(length([0x49, 0x8B, 0x8F], Some(0x30)), Some(0x80));
+        // they disagree, so neither is trusted
+        assert_eq!(length([0x49, 0x8B, 0x8F], Some(0x20)), None);
+        // neither says
+        assert_eq!(length(nothing, None), None);
     }
 
     #[test]

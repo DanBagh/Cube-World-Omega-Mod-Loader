@@ -29,11 +29,11 @@ pub const SUBTYPE: u32 = 0x4357_0000;
 const AMOUNT: i32 = 0x2C - 0x0C;
 
 // cmp dword [REC+0Ch],0 / je: a ground record with an item in it. REC is the register
-// holding the record, rbx in the avx2 client and r13 in the baseline one
-const RECORD: &str = r"(\x41?)\x83([\x78-\x7b\x7d-\x7f])\x0c\x00\x0f\x84....";
+// holding the record: rbx in the avx2 client, r13 and since game 0.1.4 r12 in the baseline
+// one. r12 takes a SIB byte
+const RECORD: &str = r"(\x41?)\x83(\x7c\x24|[\x78-\x7b\x7d-\x7f])\x0c\x00\x0f\x84....";
 // movzx eax,word [REC+2Ch] / cmp ax,[<copy>+2Ch]: its amount against the record's last copy
-const FIELD: &str =
-    r"(\x41?)\x0f\xb7([\x40-\x43\x45-\x47])\x2c\x66\x41?\x3b[\x40-\x43\x45-\x47]\x2c";
+const FIELD: &str = r"(\x41?)\x0f\xb7(\x44\x24|[\x40-\x43\x45-\x47])\x2c\x66\x41?\x3b(?:\x44\x24|[\x40-\x43\x45-\x47])\x2c";
 /// How far in front of the record check the comparison of the amount is looked for.
 const BEFORE: usize = 0x90;
 /// How far behind it the item is taken and its model fetched.
@@ -173,11 +173,17 @@ fn find_hook(module: &ModuleBuild) -> Option<Hook> {
             .find(|amount| register(&amount[1], &amount[2]) == rec)?;
         let after = &text[end..text.len().min(end + AFTER)];
         // lea <reg>,[REC+0Ch]: the item in the record, which is what the call is given
-        let item = after.windows(4).position(|code| {
+        let item = after.windows(5).position(|code| {
+            // r12 takes a SIB byte in front of the displacement
+            let displacement = if rec & 7 == 4 {
+                (code[3] == 0x24).then_some(code[4])
+            } else {
+                Some(code[3])
+            };
             code[0] & 0xF9 == 0x48 | (rec >> 3)
                 && code[1] == 0x8D
                 && code[2] & 0xC7 == 0x40 | (rec & 7)
-                && code[3] == 0x0C
+                && displacement == Some(0x0C)
         })?;
         let call = (item + 4..after.len().saturating_sub(4)).find(|&at| {
             let next = text_va + (end + at) as u32 + 5;
@@ -370,6 +376,43 @@ pub(crate) mod tests {
         pe.patch(call + 1, &relative);
         pe.code(&[0x90; 16]);
         (call, lookup)
+    }
+
+    #[test]
+    fn finds_the_lookup_through_r12() {
+        // the baseline client of game 0.1.4: the record in r12, its last copy in r8
+        let mut pe = TinyPe::new();
+        let name = pe.rdata(b"sprites/gold-coin.cub\0");
+        let lookup = pe.code(&[0x90; 8]);
+        pe.lea(name);
+        let end = pe.code(&[0xC3]);
+        pe.function(lookup, end + 1);
+        pe.code(&[0x90; 0x40]);
+        // movzx eax,word [r12+2Ch] / cmp ax,[r8+2Ch] / jne / mov [rbp+0F8h],r8
+        pe.code(&[
+            0x41, 0x0F, 0xB7, 0x44, 0x24, 0x2C, 0x66, 0x41, 0x3B, 0x40, 0x2C,
+        ]);
+        pe.code(&[0x75, 0x10, 0x4C, 0x89, 0x85, 0xF8, 0, 0, 0]);
+        // cmp dword [r12+0Ch],0 / je / lea r8,[r12+0Ch] / mov rcx,r14 / mov rdx,rsi
+        pe.code(&[0x41, 0x83, 0x7C, 0x24, 0x0C, 0x00, 0x0F, 0x84, 0, 1, 0, 0]);
+        pe.code(&[
+            0x4D, 0x8D, 0x44, 0x24, 0x0C, 0x4C, 0x89, 0xF1, 0x48, 0x89, 0xF2,
+        ]);
+        // mov [rbp+188h],r8 / mov r9,[rbp+58h]
+        pe.code(&[0x4C, 0x89, 0x85, 0x88, 1, 0, 0, 0x4C, 0x8B, 0x4D, 0x58]);
+        let call = pe.code(&[0xE8, 0, 0, 0, 0]);
+        pe.patch(call + 1, &lookup.wrapping_sub(call + 5).to_le_bytes());
+        pe.code(&[0x90; 16]);
+        let image = pe.build();
+        let refs = RefIndex::build(&image).unwrap();
+        let module = ModuleBuild {
+            backend: Backend::Baseline,
+            image: &image,
+            refs: &refs,
+            plan: ModulePlan::new(Backend::Baseline, image.timestamp, image.size_of_image),
+        };
+        let hook = find_hook(&module).unwrap();
+        assert_eq!((hook.site, hook.lookup), (call, lookup));
     }
 
     #[test]
