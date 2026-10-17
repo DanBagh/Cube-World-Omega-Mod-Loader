@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-17
+
 ### Fixed
 
 - Pickup sounds on game 0.1.4, which copies the picked up item somewhere else.
@@ -94,7 +96,8 @@ First release, for testing.
   game update moved is skipped and listed, not applied in the wrong place.
 - Two example mods: Rupees and Pet Food Labels.
 
-[unreleased]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/compare/v0.1.0...v0.1.1

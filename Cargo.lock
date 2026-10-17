@@ -468,7 +468,7 @@ checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 
 [[package]]
 name = "cwo-mod-loader"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.23.1",
  "cwoml-core",
@@ -480,14 +480,14 @@ dependencies = [
 
 [[package]]
 name = "cwoml-cli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "cwoml-core",
 ]
 
 [[package]]
 name = "cwoml-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "memchr",
  "regex",
@@ -500,7 +500,7 @@ dependencies = [
 
 [[package]]
 name = "cwoml-loader"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "cwoml-core",
  "windows-sys 0.61.2",
