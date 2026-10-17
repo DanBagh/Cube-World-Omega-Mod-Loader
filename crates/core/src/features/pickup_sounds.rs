@@ -28,6 +28,8 @@ pub const DATA_SIZE: u32 = 0x1000;
 const ITEM_COPY: &str = r"(\x41?)\x8b(\x43|\x44\x24|[\x45-\x47])(.).{0,10}?(\xc5\xf8|\xc4\xc1\x78|\x41?\x0f)\x10(\x43|\x44\x24|[\x45-\x47])(.)";
 // mov ecx,[REC+N]: and so does the count
 const COUNT: &str = r"(\x41?)\x8b(\x4b|\x4c\x24|[\x4d-\x4f])(.)";
+/// How far behind the store, or behind where the code jumps to, the copy is looked for.
+const AFTER: usize = 140;
 /// The registers a function keeps across the calls it makes, less the stack's two. The
 /// record is in one of them from the hook to where its register is read.
 const KEPT: [u8; 7] = [3, 6, 7, 12, 13, 14, 15];
@@ -119,6 +121,15 @@ fn base(extended: bool, operand: &[u8]) -> u8 {
     (operand[operand.len() - 1] & 7) | u8::from(extended) << 3
 }
 
+/// Where the first `jmp rel32` in the code from `from` on goes, if inside `text`.
+fn jumped(text: &[u8], from: usize) -> Option<usize> {
+    let window = text.get(from..text.len().min(from + AFTER))?;
+    let at = from + memchr::memchr(0xE9, window)?;
+    let relative = i32::from_le_bytes(text.get(at + 1..at + 5)?.try_into().ok()?);
+    let target = (at + 5).checked_add_signed(relative as isize)?;
+    (target < text.len()).then_some(target)
+}
+
 /// What `fits` makes of the first match of `signature` in `code` it accepts, wherever
 /// that match starts, and where the match ends.
 fn first<'h, T>(
@@ -146,15 +157,19 @@ fn find_hook(module: &ModuleBuild) -> Option<Hook> {
     let (item_copy, count) = (signature(ITEM_COPY), signature(COUNT));
     let mut found = memmem::find_iter(text, &store).filter_map(|at| {
         let end = at + store.len();
-        let after = &text[end..text.len().min(end + 140)];
-        let ((record, item), copied) = first(&item_copy, after, |hit| {
-            let record = base(!hit[1].is_empty(), &hit[2]);
-            // 41h is a REX.B prefix, C4h opens a VEX prefix that carries the same bit
-            let both = base(matches!(hit[4][0], 0x41 | 0xC4), &hit[5]) == record;
-            (both && KEPT.contains(&record) && hit[3][0] == hit[6][0].wrapping_add(16))
-                .then(|| (record, hit[6][0]))
-        })?;
-        let copied = end + copied;
+        let copy = |from: usize| {
+            let after = &text[from..text.len().min(from + AFTER)];
+            let (found, copied) = first(&item_copy, after, |hit| {
+                let record = base(!hit[1].is_empty(), &hit[2]);
+                // 41h is a REX.B prefix, C4h opens a VEX prefix that carries the same bit
+                let both = base(matches!(hit[4][0], 0x41 | 0xC4), &hit[5]) == record;
+                (both && KEPT.contains(&record) && hit[3][0] == hit[6][0].wrapping_add(16))
+                    .then(|| (record, hit[6][0]))
+            })?;
+            Some((found, from + copied))
+        };
+        // right after the store, or since game 0.1.4 where the code jumps to from there
+        let ((record, item), copied) = copy(end).or_else(|| copy(jumped(text, end)?))?;
         let rest = &text[copied..text.len().min(copied + 48)];
         let (count, _) = first(&count, rest, |hit| {
             (base(!hit[1].is_empty(), &hit[2]) == record).then(|| hit[3][0])
@@ -409,6 +424,30 @@ mod tests {
             let start = *blob_offset as usize;
             assert_eq!(module.plan.blob[start..start + 3], opening);
         }
+    }
+
+    #[test]
+    fn follows_the_jump_to_where_the_record_is_copied() {
+        // game 0.1.4: the store, the rest of the queue entry, then a jump to the copy
+        let mut pe = TinyPe::new();
+        loads(&mut pe, "sounds/pickup.wav", 0x3D);
+        let site = pe.code(&[0x66, 0xC7, 0x04, 0x01, 0x3D, 0x00]);
+        pe.code(&[0x90; 16]);
+        let jump = pe.code(&[0xE9, 0, 0, 0, 0]);
+        pe.code(&[0x90; 200]);
+        // mov eax,[r15+20h] / vmovups xmm0,[r15+10h] / mov ecx,[r15+40h]
+        let copy = pe.code(&[0x41, 0x8B, 0x47, 0x20, 0xC4, 0xC1, 0x78, 0x10, 0x47, 0x10]);
+        pe.code(&[0x90; 8]);
+        pe.code(&[0x41, 0x8B, 0x4F, 0x40]);
+        pe.code(&[0x90; 64]);
+        pe.patch(jump + 1, &copy.wrapping_sub(jump + 5).to_le_bytes());
+        let image = pe.build();
+        let refs = RefIndex::build(&image).unwrap();
+        let hook = find_hook(&module(&image, &refs)).unwrap();
+        assert_eq!(
+            (hook.site, hook.record, hook.item, hook.count),
+            (site, 15, 0x10, 0x40)
+        );
     }
 
     #[test]
