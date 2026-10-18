@@ -264,10 +264,7 @@ mod tests {
     use std::{env, fs};
 
     use super::stub::Stub;
-    use super::{
-        added_sounds, ground_models, item_models, pickup_sounds, sound_pitch, start_screen,
-        tooltips,
-    };
+    use super::{added_sounds, ground_models, item_models, sound_pitch, start_screen, tooltips};
 
     /// The assembler of the MSVC build tools: the one `ML64` names, or the newest installed.
     fn ml64() -> Option<PathBuf> {
@@ -321,7 +318,6 @@ mod tests {
         let sources = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/features/asm");
         for (name, stub) in [
             ("tooltip_hook", tooltips::STUB),
-            ("pickup_hook", pickup_sounds::STUB),
             ("pitch_hook", sound_pitch::STUB),
             ("item_model", item_models::STUB),
             ("ground_model", ground_models::STUB),

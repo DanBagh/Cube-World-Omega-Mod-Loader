@@ -23,6 +23,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Pickup sounds are played through the loader's own hooks, the way menus are,
+  instead of code written for them.
 - The Pet Food Labels example labels the food of every creature the game has,
   201 in all. The 144 creatures without a food of their own get a PINEAPPLE,
   and the cow's tames cows.
