@@ -131,37 +131,37 @@ impl Client {
         })
     }
 
-    /// Places the blob, then room for the code of `hooks` context hooks, then the data
-    /// area, each on pages of its own.
+    /// Places the blob, the data area on the page after it, where the trampolines reach
+    /// for it, then room for the code of `hooks` context hooks.
     fn place(&mut self, blob: &[u8], hooks: usize, data_size: u32) -> Option<Option<(usize, u32)>> {
         if blob.is_empty() && hooks == 0 {
             return Some(None);
         }
         let blob_pages = blob.len().next_multiple_of(PAGE);
+        let data_pages = (data_size as usize).next_multiple_of(PAGE);
         let code_pages = (hooks * context::SPACE).next_multiple_of(PAGE);
         let pages = alloc_near(
             self.base,
             self.size_of_image,
-            blob_pages + code_pages + data_size as usize,
+            blob_pages + data_pages + code_pages,
         )?;
+        let code = pages.wrapping_add(blob_pages + data_pages);
         let mut old = 0;
         // SAFETY: the pages were just committed for this, and are at least as long as the blob
         unsafe {
             ptr::copy_nonoverlapping(blob.as_ptr(), pages, blob.len());
-            // new strings and position-independent trampolines, then the hooks' code,
-            // which `write` fills in
-            VirtualProtect(
-                pages.cast(),
-                blob_pages + code_pages,
-                PAGE_EXECUTE_READ,
-                &mut old,
-            );
+            // new strings and position-independent trampolines, and the hooks' code, which
+            // `write` fills in
+            VirtualProtect(pages.cast(), blob_pages, PAGE_EXECUTE_READ, &mut old);
+            if code_pages > 0 {
+                VirtualProtect(code.cast(), code_pages, PAGE_EXECUTE_READ, &mut old);
+            }
         }
         self.blob = pages;
         self.blob_size = blob.len() as u32;
-        self.code = pages.wrapping_add(blob_pages);
+        self.code = code;
         self.code_size = code_pages;
-        let data = pages as usize + blob_pages + code_pages;
+        let data = pages as usize + blob_pages;
         Some((data_size > 0).then_some((data, data_size)))
     }
 
