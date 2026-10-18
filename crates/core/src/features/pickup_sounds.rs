@@ -28,6 +28,9 @@ pub const DATA_SIZE: u32 = 0x1000;
 const ITEM_COPY: &str = r"(\x41?)\x8b(\x43|\x44\x24|[\x45-\x47])(.).{0,10}?(\xc5\xf8|\xc4\xc1\x78|\x41?\x0f)\x10(\x43|\x44\x24|[\x45-\x47])(.)";
 // mov ecx,[REC+N]: and so does the count
 const COUNT: &str = r"(\x41?)\x8b(\x4b|\x4c\x24|[\x4d-\x4f])(.)";
+/// Set, the pickup sounds go through a context hook instead of the trampoline. For the
+/// pilot of context hooks only.
+const CONTEXT_PILOT: &str = "CWOML_CONTEXT_HOOKS";
 /// How far behind the store, or behind where the code jumps to, the copy is looked for.
 const AFTER: usize = 140;
 /// The registers a function keeps across the calls it makes, less the stack's two. The
@@ -204,7 +207,7 @@ pub fn plan(
         ));
         return 0;
     };
-    let mut table = Vec::new();
+    let mut chosen = Vec::new();
     for entry in entries {
         let Some(id) = sounds::resolve(module.image, module.refs, added, &entry.sound) else {
             report.warn(format!(
@@ -215,14 +218,29 @@ pub fn plan(
             ));
             continue;
         };
-        table.extend_from_slice(&entry.item_type.to_le_bytes());
-        table.extend_from_slice(&entry.subtype.unwrap_or(ANY).to_le_bytes());
-        table.extend_from_slice(&id.to_le_bytes());
-        table.extend_from_slice(&[0, 0]);
+        chosen.push((entry.item_type, entry.subtype.unwrap_or(ANY), id));
     }
-    let planned = table.len() / 12;
+    let planned = chosen.len();
     if planned == 0 {
         return 0;
+    }
+    let mut who: Vec<&str> = Vec::new();
+    for entry in entries {
+        if !who.contains(&entry.owner.as_str()) {
+            who.push(&entry.owner);
+        }
+    }
+    let label = format!("{planned} pickup sound(s) [{}]", who.join("+"));
+    if std::env::var_os(CONTEXT_PILOT).is_some() {
+        plan_context(module, hook, &chosen, label);
+        return planned;
+    }
+    let mut table = Vec::new();
+    for &(kind, subtype, id) in &chosen {
+        table.extend_from_slice(&kind.to_le_bytes());
+        table.extend_from_slice(&subtype.to_le_bytes());
+        table.extend_from_slice(&id.to_le_bytes());
+        table.extend_from_slice(&[0, 0]);
     }
     table.extend_from_slice(&ANY.to_le_bytes());
 
@@ -252,15 +270,9 @@ pub fn plan(
         end,
         owner: "pickup sounds".into(),
     });
-    let mut who: Vec<&str> = Vec::new();
-    for entry in entries {
-        if !who.contains(&entry.owner.as_str()) {
-            who.push(&entry.owner);
-        }
-    }
     module.plan.groups.push(Group {
         id: "pickup-sounds".into(),
-        label: format!("{planned} pickup sound(s) [{}]", who.join("+")),
+        label,
         ops: vec![
             Op::BlobRel32 {
                 blob_offset: start + resume,
@@ -274,6 +286,33 @@ pub fn plan(
         ],
     });
     planned
+}
+
+/// The same through the in-game loader's `pickup-sound` handler, for the context hook
+/// pilot: it replaces the stock store and runs after it, overwriting the id it stored.
+fn plan_context(module: &mut ModuleBuild, hook: Hook, chosen: &[(u32, u32, u16)], label: String) {
+    let mut data = vec![hook.record, hook.item];
+    for &(kind, subtype, id) in chosen {
+        data.extend(kind.to_le_bytes());
+        data.extend(subtype.to_le_bytes());
+        data.extend(id.to_le_bytes());
+    }
+    module.plan.claims.push(Claim {
+        start: hook.site,
+        end: hook.site + hook.expect.len() as u32,
+        owner: "pickup sounds".into(),
+    });
+    module.plan.groups.push(Group {
+        id: "pickup-sounds".into(),
+        label,
+        ops: vec![Op::Context {
+            rva: hook.site,
+            expect: hook.expect,
+            after: true,
+            handler: "pickup-sound".into(),
+            data,
+        }],
+    });
 }
 
 #[cfg(test)]
