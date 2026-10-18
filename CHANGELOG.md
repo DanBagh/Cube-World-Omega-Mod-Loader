@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The Pet Food Labels example labels the food of every creature the game has,
+  201 in all. The 144 creatures without a food of their own get a PINEAPPLE,
+  and the cow's tames cows.
+
 ## [0.3.1] - 2026-10-17
 
 ### Fixed

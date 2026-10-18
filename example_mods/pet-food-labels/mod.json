@@ -2,11 +2,96 @@
 	"schema": 1,
 	"id": "pet-food-labels",
 	"name": "Pet Food Labels",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"authors": ["DanBagh"],
 	"loader": ">=0.2.0",
-	"description": "Adds a tooltip line to every taming food saying which creature it is for.",
+	"description": "Adds a tooltip line to every taming food saying which creature it is for, including each PINEAPPLE, the food of every creature that has none of its own.",
 	"tooltips": [
+		{
+			"type": 95,
+			"subtype": 0,
+			"line": "TAMES ELF"
+		},
+		{
+			"type": 95,
+			"subtype": 1,
+			"line": "TAMES ELF"
+		},
+		{
+			"type": 95,
+			"subtype": 2,
+			"line": "TAMES HUMAN"
+		},
+		{
+			"type": 95,
+			"subtype": 3,
+			"line": "TAMES HUMAN"
+		},
+		{
+			"type": 95,
+			"subtype": 4,
+			"line": "TAMES DWARF"
+		},
+		{
+			"type": 95,
+			"subtype": 5,
+			"line": "TAMES DWARF"
+		},
+		{
+			"type": 95,
+			"subtype": 6,
+			"line": "TAMES GOBLIN"
+		},
+		{
+			"type": 95,
+			"subtype": 7,
+			"line": "TAMES GOBLIN"
+		},
+		{
+			"type": 95,
+			"subtype": 8,
+			"line": "TAMES LIZARDMAN"
+		},
+		{
+			"type": 95,
+			"subtype": 9,
+			"line": "TAMES LIZARDMAN"
+		},
+		{
+			"type": 95,
+			"subtype": 10,
+			"line": "TAMES UNDEAD"
+		},
+		{
+			"type": 95,
+			"subtype": 11,
+			"line": "TAMES UNDEAD"
+		},
+		{
+			"type": 95,
+			"subtype": 12,
+			"line": "TAMES FROGMAN"
+		},
+		{
+			"type": 95,
+			"subtype": 13,
+			"line": "TAMES FROGMAN"
+		},
+		{
+			"type": 95,
+			"subtype": 14,
+			"line": "TAMES ORC"
+		},
+		{
+			"type": 95,
+			"subtype": 15,
+			"line": "TAMES ORC"
+		},
+		{
+			"type": 95,
+			"subtype": 16,
+			"line": "TAMES ZOMBIE"
+		},
 		{
 			"type": 95,
 			"subtype": 17,
@@ -29,6 +114,11 @@
 		},
 		{
 			"type": 95,
+			"subtype": 21,
+			"line": "TAMES HEDGEHOG"
+		},
+		{
+			"type": 95,
 			"subtype": 22,
 			"line": "TAMES HORNET"
 		},
@@ -44,13 +134,93 @@
 		},
 		{
 			"type": 95,
+			"subtype": 25,
+			"line": "TAMES TROLL"
+		},
+		{
+			"type": 95,
+			"subtype": 26,
+			"line": "TAMES OGRE"
+		},
+		{
+			"type": 95,
+			"subtype": 27,
+			"line": "TAMES BUSH"
+		},
+		{
+			"type": 95,
+			"subtype": 28,
+			"line": "TAMES SNOW BUSH"
+		},
+		{
+			"type": 95,
+			"subtype": 29,
+			"line": "TAMES IRON DEPOSIT"
+		},
+		{
+			"type": 95,
+			"subtype": 30,
+			"line": "TAMES SILVER DEPOSIT"
+		},
+		{
+			"type": 95,
+			"subtype": 31,
+			"line": "TAMES GOLD DEPOSIT"
+		},
+		{
+			"type": 95,
+			"subtype": 32,
+			"line": "TAMES EMERALD DEPOSIT"
+		},
+		{
+			"type": 95,
+			"subtype": 33,
+			"line": "TAMES SAPPHIRE DEPOSIT"
+		},
+		{
+			"type": 95,
+			"subtype": 34,
+			"line": "TAMES RUBY DEPOSIT"
+		},
+		{
+			"type": 95,
+			"subtype": 35,
+			"line": "TAMES DIAMOND DEPOSIT"
+		},
+		{
+			"type": 95,
+			"subtype": 36,
+			"line": "TAMES WATER BUBBLE"
+		},
+		{
+			"type": 95,
 			"subtype": 37,
 			"line": "TAMES MOLE"
 		},
 		{
 			"type": 95,
+			"subtype": 38,
+			"line": "TAMES SKELETON"
+		},
+		{
+			"type": 95,
+			"subtype": 39,
+			"line": "TAMES OLD MAN"
+		},
+		{
+			"type": 95,
 			"subtype": 40,
 			"line": "TAMES COLLIE"
+		},
+		{
+			"type": 95,
+			"subtype": 41,
+			"line": "TAMES SHEPHERD DOG"
+		},
+		{
+			"type": 95,
+			"subtype": 42,
+			"line": "TAMES SKULL BULL"
 		},
 		{
 			"type": 95,
@@ -61,6 +231,11 @@
 			"type": 95,
 			"subtype": 44,
 			"line": "TAMES BROWN ALPACA"
+		},
+		{
+			"type": 95,
+			"subtype": 45,
+			"line": "TAMES EGG"
 		},
 		{
 			"type": 95,
@@ -79,8 +254,28 @@
 		},
 		{
 			"type": 95,
+			"subtype": 49,
+			"line": "TAMES WOLF"
+		},
+		{
+			"type": 95,
+			"subtype": 50,
+			"line": "TAMES PANTHER"
+		},
+		{
+			"type": 95,
 			"subtype": 51,
 			"line": "TAMES CAT"
+		},
+		{
+			"type": 95,
+			"subtype": 52,
+			"line": "TAMES BROWN CAT"
+		},
+		{
+			"type": 95,
+			"subtype": 53,
+			"line": "TAMES WHITE CAT"
 		},
 		{
 			"type": 95,
@@ -104,8 +299,53 @@
 		},
 		{
 			"type": 95,
+			"subtype": 58,
+			"line": "TAMES FRIGHTENER"
+		},
+		{
+			"type": 95,
+			"subtype": 59,
+			"line": "TAMES SAND HORROR"
+		},
+		{
+			"type": 95,
+			"subtype": 60,
+			"line": "TAMES WIZARD"
+		},
+		{
+			"type": 95,
+			"subtype": 61,
+			"line": "TAMES ROCKLING"
+		},
+		{
+			"type": 95,
+			"subtype": 62,
+			"line": "TAMES GNOLL"
+		},
+		{
+			"type": 95,
+			"subtype": 63,
+			"line": "TAMES POLAR GNOLL"
+		},
+		{
+			"type": 95,
 			"subtype": 64,
 			"line": "TAMES MONKEY"
+		},
+		{
+			"type": 95,
+			"subtype": 65,
+			"line": "TAMES GNOBOLD"
+		},
+		{
+			"type": 95,
+			"subtype": 66,
+			"line": "TAMES INSECTOID"
+		},
+		{
+			"type": 95,
+			"subtype": 67,
+			"line": "TAMES INSECT GUARD"
 		},
 		{
 			"type": 95,
@@ -169,6 +409,11 @@
 		},
 		{
 			"type": 95,
+			"subtype": 80,
+			"line": "TAMES FROG"
+		},
+		{
+			"type": 95,
 			"subtype": 81,
 			"line": "TAMES DUCKBILL"
 		},
@@ -176,6 +421,41 @@
 			"type": 95,
 			"subtype": 82,
 			"line": "TAMES CROCODILE"
+		},
+		{
+			"type": 95,
+			"subtype": 83,
+			"line": "TAMES ANUBIS"
+		},
+		{
+			"type": 95,
+			"subtype": 84,
+			"line": "TAMES HORUS"
+		},
+		{
+			"type": 95,
+			"subtype": 85,
+			"line": "TAMES JESTER"
+		},
+		{
+			"type": 95,
+			"subtype": 86,
+			"line": "TAMES SPECTRINO"
+		},
+		{
+			"type": 95,
+			"subtype": 87,
+			"line": "TAMES DJINN"
+		},
+		{
+			"type": 95,
+			"subtype": 88,
+			"line": "TAMES MINOTAUR"
+		},
+		{
+			"type": 95,
+			"subtype": 89,
+			"line": "TAMES IMP"
 		},
 		{
 			"type": 95,
@@ -214,6 +494,16 @@
 		},
 		{
 			"type": 95,
+			"subtype": 97,
+			"line": "TAMES WEREWOLF"
+		},
+		{
+			"type": 95,
+			"subtype": 98,
+			"line": "TAMES VAMPIRE"
+		},
+		{
+			"type": 95,
 			"subtype": 99,
 			"line": "TAMES PONY"
 		},
@@ -221,6 +511,11 @@
 			"type": 95,
 			"subtype": 100,
 			"line": "TAMES CAMEL"
+		},
+		{
+			"type": 95,
+			"subtype": 101,
+			"line": "TAMES COW"
 		},
 		{
 			"type": 95,
@@ -244,13 +539,268 @@
 		},
 		{
 			"type": 95,
+			"subtype": 106,
+			"line": "TAMES HELL DEMON"
+		},
+		{
+			"type": 95,
+			"subtype": 107,
+			"line": "TAMES GOLEM"
+		},
+		{
+			"type": 95,
+			"subtype": 108,
+			"line": "TAMES EMBER GOLEM"
+		},
+		{
+			"type": 95,
+			"subtype": 109,
+			"line": "TAMES SNOW GOLEM"
+		},
+		{
+			"type": 95,
+			"subtype": 110,
+			"line": "TAMES YETI"
+		},
+		{
+			"type": 95,
+			"subtype": 111,
+			"line": "TAMES CYCLOPS"
+		},
+		{
+			"type": 95,
+			"subtype": 112,
+			"line": "TAMES MAMMOTH"
+		},
+		{
+			"type": 95,
+			"subtype": 113,
+			"line": "TAMES LICH"
+		},
+		{
+			"type": 95,
+			"subtype": 114,
+			"line": "TAMES SNOW BERRY BUSH"
+		},
+		{
+			"type": 95,
+			"subtype": 115,
+			"line": "TAMES COTTON PLANT"
+		},
+		{
+			"type": 95,
+			"subtype": 116,
+			"line": "TAMES SCRUB"
+		},
+		{
+			"type": 95,
+			"subtype": 117,
+			"line": "TAMES COBWEB SCRUB"
+		},
+		{
+			"type": 95,
+			"subtype": 118,
+			"line": "TAMES FIRE SCRUB"
+		},
+		{
+			"type": 95,
+			"subtype": 119,
+			"line": "TAMES GINSENG"
+		},
+		{
+			"type": 95,
+			"subtype": 120,
+			"line": "TAMES CACTUS"
+		},
+		{
+			"type": 95,
+			"subtype": 121,
+			"line": "TAMES THORN TREE"
+		},
+		{
+			"type": 95,
+			"subtype": 122,
+			"line": "TAMES SCARE CROW"
+		},
+		{
+			"type": 95,
+			"subtype": 123,
+			"line": "TAMES AIM"
+		},
+		{
+			"type": 95,
+			"subtype": 124,
+			"line": "TAMES DUMMY"
+		},
+		{
+			"type": 95,
+			"subtype": 125,
+			"line": "TAMES VASE"
+		},
+		{
+			"type": 95,
+			"subtype": 126,
+			"line": "TAMES BOMB"
+		},
+		{
+			"type": 95,
+			"subtype": 127,
+			"line": "TAMES BLUE FISH"
+		},
+		{
+			"type": 95,
+			"subtype": 128,
+			"line": "TAMES YELLOW FISH"
+		},
+		{
+			"type": 95,
+			"subtype": 129,
+			"line": "TAMES SEAHORSE"
+		},
+		{
+			"type": 95,
+			"subtype": 130,
+			"line": "TAMES MERMAID"
+		},
+		{
+			"type": 95,
+			"subtype": 131,
+			"line": "TAMES MERMAN"
+		},
+		{
+			"type": 95,
+			"subtype": 132,
+			"line": "TAMES SHARK"
+		},
+		{
+			"type": 95,
+			"subtype": 133,
+			"line": "TAMES LANTERN FISH"
+		},
+		{
+			"type": 95,
+			"subtype": 134,
+			"line": "TAMES MAW FISH"
+		},
+		{
+			"type": 95,
+			"subtype": 135,
+			"line": "TAMES PIRANHA"
+		},
+		{
+			"type": 95,
+			"subtype": 136,
+			"line": "TAMES BLOW FISH"
+		},
+		{
+			"type": 95,
 			"subtype": 137,
 			"line": "TAMES BEAVER"
 		},
 		{
 			"type": 95,
+			"subtype": 138,
+			"line": "TAMES MOOSE"
+		},
+		{
+			"type": 95,
+			"subtype": 139,
+			"line": "TAMES ZEBRA"
+		},
+		{
+			"type": 95,
+			"subtype": 140,
+			"line": "TAMES ELEPHANT"
+		},
+		{
+			"type": 95,
+			"subtype": 141,
+			"line": "TAMES ICELING"
+		},
+		{
+			"type": 95,
+			"subtype": 142,
+			"line": "TAMES RHINO"
+		},
+		{
+			"type": 95,
+			"subtype": 143,
+			"line": "TAMES OSTRICH"
+		},
+		{
+			"type": 95,
+			"subtype": 144,
+			"line": "TAMES LION"
+		},
+		{
+			"type": 95,
+			"subtype": 145,
+			"line": "TAMES LIONESS"
+		},
+		{
+			"type": 95,
+			"subtype": 146,
+			"line": "TAMES SKELETON KNIGHT"
+		},
+		{
+			"type": 95,
+			"subtype": 147,
+			"line": "TAMES SKELETON HORSE"
+		},
+		{
+			"type": 95,
+			"subtype": 148,
+			"line": "TAMES SORCERER"
+		},
+		{
+			"type": 95,
+			"subtype": 149,
+			"line": "TAMES HYENA"
+		},
+		{
+			"type": 95,
+			"subtype": 150,
+			"line": "TAMES GIRAFFE"
+		},
+		{
+			"type": 95,
 			"subtype": 151,
 			"line": "TAMES WARTHOG"
+		},
+		{
+			"type": 95,
+			"subtype": 152,
+			"line": "TAMES ANTELOPE"
+		},
+		{
+			"type": 95,
+			"subtype": 153,
+			"line": "TAMES MAKAKE"
+		},
+		{
+			"type": 95,
+			"subtype": 154,
+			"line": "TAMES SKELETON DOG"
+		},
+		{
+			"type": 95,
+			"subtype": 155,
+			"line": "TAMES LAVA TURTLE"
+		},
+		{
+			"type": 95,
+			"subtype": 156,
+			"line": "TAMES MANTIS"
+		},
+		{
+			"type": 95,
+			"subtype": 157,
+			"line": "TAMES PLANT CREATURE"
+		},
+		{
+			"type": 95,
+			"subtype": 158,
+			"line": "TAMES RADISH CREATURE"
 		},
 		{
 			"type": 95,
@@ -264,6 +814,21 @@
 		},
 		{
 			"type": 95,
+			"subtype": 161,
+			"line": "TAMES ONIONLING"
+		},
+		{
+			"type": 95,
+			"subtype": 162,
+			"line": "TAMES DESERT ONIONLING"
+		},
+		{
+			"type": 95,
+			"subtype": 163,
+			"line": "TAMES SEEKER"
+		},
+		{
+			"type": 95,
 			"subtype": 164,
 			"line": "TAMES BABY ELEPHANT"
 		},
@@ -274,8 +839,133 @@
 		},
 		{
 			"type": 95,
+			"subtype": 166,
+			"line": "TAMES PIRATE"
+		},
+		{
+			"type": 95,
+			"subtype": 167,
+			"line": "TAMES PIRATE"
+		},
+		{
+			"type": 95,
+			"subtype": 168,
+			"line": "TAMES PIRATE CAPTAIN"
+		},
+		{
+			"type": 95,
 			"subtype": 169,
 			"line": "TAMES FLAMINGO"
+		},
+		{
+			"type": 95,
+			"subtype": 170,
+			"line": "TAMES TOUCAN"
+		},
+		{
+			"type": 95,
+			"subtype": 171,
+			"line": "TAMES SILVER LION"
+		},
+		{
+			"type": 95,
+			"subtype": 172,
+			"line": "TAMES BLUE TURTLE"
+		},
+		{
+			"type": 95,
+			"subtype": 173,
+			"line": "TAMES SNOW GNOBOLD"
+		},
+		{
+			"type": 95,
+			"subtype": 174,
+			"line": "TAMES SAVAGE DOG"
+		},
+		{
+			"type": 95,
+			"subtype": 175,
+			"line": "TAMES SNOW LION"
+		},
+		{
+			"type": 95,
+			"subtype": 176,
+			"line": "TAMES SNOW LIONESS"
+		},
+		{
+			"type": 95,
+			"subtype": 177,
+			"line": "TAMES SNOW LEOPARD"
+		},
+		{
+			"type": 95,
+			"subtype": 178,
+			"line": "TAMES ALPHA DOG"
+		},
+		{
+			"type": 95,
+			"subtype": 179,
+			"line": "TAMES FLYING EYE"
+		},
+		{
+			"type": 95,
+			"subtype": 180,
+			"line": "TAMES DEMON MARAUDER"
+		},
+		{
+			"type": 95,
+			"subtype": 181,
+			"line": "TAMES DARK CULTIST"
+		},
+		{
+			"type": 95,
+			"subtype": 182,
+			"line": "TAMES DARK CULTIST"
+		},
+		{
+			"type": 95,
+			"subtype": 183,
+			"line": "TAMES CRAWLER"
+		},
+		{
+			"type": 95,
+			"subtype": 184,
+			"line": "TAMES NECROMANCER"
+		},
+		{
+			"type": 95,
+			"subtype": 185,
+			"line": "TAMES TREANT"
+		},
+		{
+			"type": 95,
+			"subtype": 186,
+			"line": "TAMES WRAITH"
+		},
+		{
+			"type": 95,
+			"subtype": 187,
+			"line": "TAMES MANA DEER"
+		},
+		{
+			"type": 95,
+			"subtype": 188,
+			"line": "TAMES CHILING"
+		},
+		{
+			"type": 95,
+			"subtype": 189,
+			"line": "TAMES CHILING SPROUT"
+		},
+		{
+			"type": 95,
+			"subtype": 190,
+			"line": "TAMES HABANERO"
+		},
+		{
+			"type": 95,
+			"subtype": 191,
+			"line": "TAMES BLOOMLING"
 		},
 		{
 			"type": 95,
@@ -291,6 +981,36 @@
 			"type": 95,
 			"subtype": 194,
 			"line": "TAMES SNAIL"
+		},
+		{
+			"type": 95,
+			"subtype": 195,
+			"line": "TAMES DARK JESTER"
+		},
+		{
+			"type": 95,
+			"subtype": 196,
+			"line": "TAMES MEAN MUSHROOM"
+		},
+		{
+			"type": 95,
+			"subtype": 197,
+			"line": "TAMES MONSTROSITY"
+		},
+		{
+			"type": 95,
+			"subtype": 198,
+			"line": "TAMES DEMON PORTAL"
+		},
+		{
+			"type": 95,
+			"subtype": 199,
+			"line": "TAMES ANGEL"
+		},
+		{
+			"type": 95,
+			"subtype": 200,
+			"line": "TAMES FOREST SPIRIT"
 		}
 	]
 }
