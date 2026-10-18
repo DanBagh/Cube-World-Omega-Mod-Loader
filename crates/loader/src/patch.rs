@@ -3,6 +3,7 @@
 //! A group is verified as a whole against the bytes the plan expects and applied only if
 //! all of it matches, so a plan made for another build does nothing instead of doing harm.
 
+use std::cell::Cell;
 use std::ffi::{CString, c_void};
 use std::ptr;
 
@@ -14,6 +15,7 @@ use windows_sys::Win32::System::Memory::{
 };
 use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
+use crate::context;
 use crate::log::log;
 use crate::plan::{MAX_HOOK, Module, Op, Plan};
 
@@ -37,6 +39,10 @@ struct Client {
     /// The plan's blob, placed within rel32 reach of the whole module.
     blob: *mut u8,
     blob_size: u32,
+    /// Room for the code of context hooks, `context::SPACE` each, and how much is taken.
+    code: *mut u8,
+    code_size: usize,
+    code_used: Cell<usize>,
 }
 
 /// Replaces bytes of code or read-only data.
@@ -119,30 +125,44 @@ impl Client {
             size_of_image,
             blob: ptr::null_mut(),
             blob_size: 0,
+            code: ptr::null_mut(),
+            code_size: 0,
+            code_used: Cell::new(0),
         })
     }
 
-    /// Places the blob, and the data area on pages of its own after it.
-    fn place(&mut self, blob: &[u8], data_size: u32) -> Option<Option<(usize, u32)>> {
-        if blob.is_empty() {
+    /// Places the blob, then room for the code of `hooks` context hooks, then the data
+    /// area, each on pages of its own.
+    fn place(&mut self, blob: &[u8], hooks: usize, data_size: u32) -> Option<Option<(usize, u32)>> {
+        if blob.is_empty() && hooks == 0 {
             return Some(None);
         }
         let blob_pages = blob.len().next_multiple_of(PAGE);
+        let code_pages = (hooks * context::SPACE).next_multiple_of(PAGE);
         let pages = alloc_near(
             self.base,
             self.size_of_image,
-            blob_pages + data_size as usize,
+            blob_pages + code_pages + data_size as usize,
         )?;
         let mut old = 0;
         // SAFETY: the pages were just committed for this, and are at least as long as the blob
         unsafe {
             ptr::copy_nonoverlapping(blob.as_ptr(), pages, blob.len());
-            // new strings and position-independent trampolines
-            VirtualProtect(pages.cast(), blob.len(), PAGE_EXECUTE_READ, &mut old);
+            // new strings and position-independent trampolines, then the hooks' code,
+            // which `write` fills in
+            VirtualProtect(
+                pages.cast(),
+                blob_pages + code_pages,
+                PAGE_EXECUTE_READ,
+                &mut old,
+            );
         }
         self.blob = pages;
         self.blob_size = blob.len() as u32;
-        Some((data_size > 0).then(|| (pages as usize + blob_pages, data_size)))
+        self.code = pages.wrapping_add(blob_pages);
+        self.code_size = code_pages;
+        let data = pages as usize + blob_pages + code_pages;
+        Some((data_size > 0).then_some((data, data_size)))
     }
 
     fn holds(&self, rva: u32, len: usize) -> bool {
@@ -201,6 +221,18 @@ impl Client {
                     u64::from(*blob_offset) + 4 <= u64::from(self.blob_size)
                         && *target < self.size_of_image
                 }
+                Op::Context {
+                    rva,
+                    expect,
+                    handler,
+                    data,
+                    ..
+                } => {
+                    (5..=MAX_HOOK).contains(&expect.len())
+                        && context::valid(handler, data)
+                        && self.holds(*rva, expect.len())
+                        && self.bytes(*rva, expect.len()) == expect
+                }
             }
         }
     }
@@ -209,6 +241,16 @@ impl Client {
         let module = |rva: u32| self.base as i64 + i64::from(rva);
         let blob = |offset: u32| self.blob as i64 + i64::from(offset);
         let rel32 = |to: i64, from: i64| i32::try_from(to - from).ok().map(i32::to_le_bytes);
+        // jmp rel32, then NOPs over the rest of what it replaces
+        let jump = |rva: u32, len: usize, to: i64| {
+            rel32(to, module(rva) + 5).is_some_and(|bytes| {
+                let mut code = [0x90u8; MAX_HOOK];
+                code[0] = 0xE9;
+                code[1..5].copy_from_slice(&bytes);
+                // SAFETY: `verify` has allowed the range
+                unsafe { write(module(rva) as *mut u8, &code[..len]) }
+            })
+        };
         // SAFETY: `verify` has allowed every range written here
         unsafe {
             match op {
@@ -227,18 +269,35 @@ impl Client {
                     rva,
                     expect,
                     blob_offset,
-                } => rel32(blob(*blob_offset), module(*rva) + 5).is_some_and(|bytes| {
-                    // jmp rel32 into the blob, then NOPs over the rest of what it replaces
-                    let mut code = [0x90u8; MAX_HOOK];
-                    code[0] = 0xE9;
-                    code[1..5].copy_from_slice(&bytes);
-                    write(module(*rva) as *mut u8, &code[..expect.len()])
-                }),
+                } => jump(*rva, expect.len(), blob(*blob_offset)),
                 Op::BlobRel32 {
                     blob_offset,
                     target,
                 } => rel32(module(*target), blob(*blob_offset) + 4)
                     .is_some_and(|bytes| write(blob(*blob_offset) as *mut u8, &bytes)),
+                Op::Context {
+                    rva,
+                    expect,
+                    after,
+                    handler,
+                    data,
+                } => {
+                    let used = self.code_used.get();
+                    let Some(hook) = (used + context::SPACE <= self.code_size)
+                        .then(|| context::hook(handler, data))
+                        .flatten()
+                    else {
+                        return false;
+                    };
+                    self.code_used.set(used + context::SPACE);
+                    let at = self.code.add(used);
+                    let back = module(*rva) + expect.len() as i64;
+                    let entry = context::entry as *const () as u64;
+                    let (code, resume) =
+                        context::code(expect, *after, hook as u64, entry, back as u64);
+                    (*hook).resume = at as usize + resume;
+                    write(at, &code) && jump(*rva, expect.len(), at as i64)
+                }
             }
         }
     }
@@ -258,7 +317,11 @@ pub fn run(plan: &Plan) -> Done {
             log!("plan: bad blob, module skipped");
             continue;
         };
-        match client.place(blob, module.data_size) {
+        let hooks = (module.groups.iter())
+            .flat_map(|group| group.ops.iter().flatten())
+            .filter(|op| matches!(op, Op::Context { .. }))
+            .count();
+        match client.place(blob, hooks, module.data_size) {
             Some(data) => done.data = data.or(done.data),
             None => {
                 log!(

@@ -37,6 +37,15 @@ pub enum Op {
     },
     /// Point a rel32 inside the blob at an address in the module.
     BlobRel32 { blob_offset: u32, target: u32 },
+    /// Replace `expect` with a jump to a handler of this DLL, which runs before or `after`
+    /// the replaced instructions. See `context`.
+    Context {
+        rva: u32,
+        expect: Vec<u8>,
+        after: bool,
+        handler: String,
+        data: Vec<u8>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,6 +136,23 @@ fn op(fields: &[&str]) -> Option<Op> {
             blob_offset: hex(blob_offset)?,
             target: hex(target)?,
         },
+        ["context", rva, expect, when, handler, data, ..] => {
+            let expect = bytes(expect)?;
+            if !(5..=MAX_HOOK).contains(&expect.len()) {
+                return None;
+            }
+            Op::Context {
+                rva: hex(rva)?,
+                expect,
+                after: match when {
+                    "after" => true,
+                    "before" => false,
+                    _ => return None,
+                },
+                handler: handler.to_owned(),
+                data: bytes(data)?,
+            }
+        }
         _ => return None,
     })
 }
@@ -189,7 +215,10 @@ pub fn parse(text: &str) -> Result<Plan, &'static str> {
             ["redirect", key, target, ..] => {
                 plan.redirects.push((key.to_owned(), target.to_owned()))
             }
-            ["rel32" | "ptr64" | "bytes" | "hook" | "blobrel32", ..] if in_group => {
+            [
+                "rel32" | "ptr64" | "bytes" | "hook" | "blobrel32" | "context",
+                ..,
+            ] if in_group => {
                 if let Some(group) = plan.modules.last_mut().and_then(|m| m.groups.last_mut()) {
                     match (op(&fields), &mut group.ops) {
                         (Some(op), Some(ops)) => ops.push(op),
@@ -245,6 +274,13 @@ mod tests {
                     blob_offset: 0x24,
                     target: 0xDEF,
                 },
+                written::Op::Context {
+                    rva: 0x182991,
+                    expect: vec![0x66, 0xC7, 0x04, 0x01, 0x3D, 0x00],
+                    after: true,
+                    handler: "pickup-sound".into(),
+                    data: vec![15, 0x10],
+                },
             ],
         });
         let blob = module.blob.clone();
@@ -296,6 +332,13 @@ mod tests {
                 Op::BlobRel32 {
                     blob_offset: 0x24,
                     target: 0xDEF
+                },
+                Op::Context {
+                    rva: 0x182991,
+                    expect: vec![0x66, 0xC7, 0x04, 0x01, 0x3D, 0x00],
+                    after: true,
+                    handler: "pickup-sound".into(),
+                    data: vec![15, 0x10]
                 },
             ]
         );

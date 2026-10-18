@@ -14,6 +14,7 @@
 //! the real dbghelp.dll, applies the plan to the client, and serves replacement files by
 //! hooking the client's imports. Nothing in the game folder is changed.
 
+pub mod context;
 pub mod plan;
 
 #[cfg(windows)]

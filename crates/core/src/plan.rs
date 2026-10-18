@@ -49,6 +49,16 @@ pub enum Op {
     },
     /// Point a rel32 inside the blob at an address in the module.
     BlobRel32 { blob_offset: u32, target: u32 },
+    /// Replace `expect` with a jump to a handler of the in-game loader, which runs before
+    /// or `after` the replaced instructions. They run elsewhere, so they must not be
+    /// RIP-relative or jump.
+    Context {
+        rva: u32,
+        expect: Vec<u8>,
+        after: bool,
+        handler: String,
+        data: Vec<u8>,
+    },
 }
 
 /// Operations that are applied together or not at all.
@@ -224,6 +234,19 @@ impl Plan {
                             blob_offset,
                             target,
                         } => writeln!(out, "blobrel32\t{blob_offset:X}\t{target:X}"),
+                        Op::Context {
+                            rva,
+                            expect,
+                            after,
+                            handler,
+                            data,
+                        } => writeln!(
+                            out,
+                            "context\t{rva:X}\t{}\t{}\t{handler}\t{}",
+                            hex(expect),
+                            if *after { "after" } else { "before" },
+                            hex(data)
+                        ),
                     };
                 }
                 out.push_str("endgroup\n");
