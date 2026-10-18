@@ -14,7 +14,7 @@
 - `line` is one line of plain ASCII, at most 60 characters.
 
 The line shows right above the game's own hints, such as `M1 EQUIP`, in their
-style. The game wraps it when it is long. The coloured descriptions some items
+style. The game wraps it when it is long. The colored descriptions some items
 have are drawn elsewhere, and are not what this adds to.
 
 Lines never conflict: when several mods add lines to one item, all of them

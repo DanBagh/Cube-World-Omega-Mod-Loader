@@ -443,7 +443,7 @@ fn loader_status(paths: State<Paths>) -> LoaderStatus {
 
 /// Plans the active profile's mods and puts the loader into the game folder, so the game
 /// starts with them. Starting the game stays with the Wollay Launcher.
-// not on the main thread: analysing the client takes a few seconds
+// not on the main thread: analyzing the client takes a few seconds
 #[tauri::command(async)]
 fn apply_profile(paths: State<Paths>) -> Result<Applied, String> {
     let game = game::find(None, DEFAULT_CHANNEL).map_err(|e| e.to_string())?;

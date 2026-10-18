@@ -23,10 +23,10 @@ const MAX_LOGGED: u32 = 64;
 const CRT: &CStr = c"api-ms-win-crt-stdio-l1-1-0.dll";
 
 struct Redirects {
-    /// Folder of the client DLL, normalised, with its trailing slash. Opens by absolute
+    /// Folder of the client DLL, normalized, with its trailing slash. Opens by absolute
     /// path under it match too.
     root: Vec<u16>,
-    /// Normalised game-relative path, and the NUL-terminated file to open instead.
+    /// Normalized game-relative path, and the NUL-terminated file to open instead.
     entries: Vec<(Vec<u16>, Vec<u16>)>,
 }
 

@@ -23,7 +23,7 @@ const EARLIER_NAME: &str = "version.dll";
 /// Beside the DLL: a text file whose first line is the folder the loader reads its plan
 /// from. `cwoml-loader` has the same name.
 pub const HOME_FILE: &str = "cwoml.txt";
-/// An export only the loader has. Its name in a file is how the loader is recognised.
+/// An export only the loader has. Its name in a file is how the loader is recognized.
 pub const MARKER: &str = "CwomlLoaderInfo";
 
 /// The in-game loader as built with this app. None on a system it is not built for.
@@ -262,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn the_embedded_loader_is_recognised() {
+    fn the_embedded_loader_is_recognized() {
         if let Some(dll) = embedded() {
             assert!(dll.starts_with(b"MZ") && is_loader(dll));
         }

@@ -85,7 +85,7 @@ struct Append {
 
 /// Where `text`, two to four characters, is appended to a buffer as an immediate.
 ///
-/// Recognised: a word store of two characters or a dword store of four with the store of
+/// Recognized: a word store of two characters or a dword store of four with the store of
 /// the NUL directly after or before it, and a dword store of three characters plus the
 /// NUL. The NUL is what tells text from a number with the same bytes.
 pub fn find(image: &PeImage, text: &[u8]) -> Vec<InlineText> {

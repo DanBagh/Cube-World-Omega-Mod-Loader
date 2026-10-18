@@ -22,7 +22,7 @@ For Windows, and for Linux where the game runs under Wine or Proton (see
    [latest release](https://github.com/DanBagh/Cube-World-Omega-Mod-Loader/releases/latest) and put it in a folder of its
    own. It keeps its data in a `cwoml-data` folder beside it.
 2. Start it. The app is not signed yet, so Windows may say it is
-   unrecognised: choose More info, then Run anyway.
+   unrecognized: choose More info, then Run anyway.
 3. Import mods from Manage mods, or drop `.zip` files on the window. The
    example mods are attached to each release.
 4. Turn on the mods you want, then press Apply (Enable mods while mods are
@@ -111,7 +111,7 @@ Open http://localhost:1420. Calls to the backend do not work there.
 The backend is a Cargo workspace:
 
 - `crates/core/` is the mod loader as a library, with no Tauri in it: finding
-  the game, reading and ordering mods, analysing the client DLLs and planning
+  the game, reading and ordering mods, analyzing the client DLLs and planning
   the patches. Each kind of mod content is one module in `src/features/`.
 - `crates/loader/` is the DLL that runs inside the game. It applies the plan
   the library writes and does nothing else. The library's build script builds

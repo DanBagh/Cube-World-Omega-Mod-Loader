@@ -141,7 +141,7 @@ pub fn string_sites(image: &PeImage, index: &RefIndex, needle: &[u8]) -> BTreeMa
 ///
 /// The compiler builds a string view as a pointer plus an immediate length. This looks for
 /// `mov r32, imm32` or `mov r/m, imm32` carrying exactly that length shortly before or after
-/// the `lea`. It errs towards saying yes, which only makes text patches stricter.
+/// the `lea`. It errs toward saying yes, which only makes text patches stricter.
 fn has_baked_length(image: &PeImage, site: u32, length: usize) -> bool {
     let Some((text_va, text)) = image.data(".text") else {
         return false;

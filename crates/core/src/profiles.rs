@@ -136,7 +136,7 @@ impl Profiles {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
         }
-        let text = serde_json::to_string_pretty(self).expect("profiles serialise");
+        let text = serde_json::to_string_pretty(self).expect("profiles serialize");
         let temporary = path.with_extension("tmp");
         fs::write(&temporary, text + "\n").map_err(|e| Error::io(&temporary, e))?;
         fs::rename(&temporary, path).map_err(|e| Error::io(path, e))

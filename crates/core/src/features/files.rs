@@ -69,7 +69,7 @@ pub fn usable_model(
     let keyed = model.keyed();
     if keyed > 0 {
         warn(format!(
-            "{keyed} voxel(s) are pure red, green or blue, which the game leaves out of a model; use a slightly different colour"
+            "{keyed} voxel(s) are pure red, green or blue, which the game leaves out of a model; use a slightly different color"
         ));
     }
     if source

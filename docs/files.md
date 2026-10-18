@@ -36,10 +36,10 @@ black means an empty cell.
 
 - **Size:** a model has at most 131072 cells, its width times depth times
   height, and each side at most 1024.
-- **Colours the game drops:** pure red, green and blue (`#ff0000`, `#00ff00`,
-  `#0000ff`) never show, because the game leaves voxels of those colours out
+- **Colors the game drops:** pure red, green and blue (`#ff0000`, `#00ff00`,
+  `#0000ff`) never show, because the game leaves voxels of those colors out
   of a model. The Apply dialog warns about them. Use a slightly different
-  colour.
+  color.
 - **Black:** in a `.vox`, pure black is turned into a near black, since black
   would read as empty.
 - **Only the first model** of a `.vox` file is used.

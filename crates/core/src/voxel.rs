@@ -13,13 +13,13 @@ pub type Rgb = [u8; 3];
 /// Cells the game loads from one model. It reads no further.
 pub const MAX_CELLS: u64 = 0x20000;
 const MAX_SIDE: u32 = 1024;
-/// The game leaves voxels of these colours out of a model when it loads it.
-const KEY_COLOURS: [Rgb; 3] = [[255, 0, 0], [0, 255, 0], [0, 0, 255]];
+/// The game leaves voxels of these colors out of a model when it loads it.
+const KEY_COLORS: [Rgb; 3] = [[255, 0, 0], [0, 255, 0], [0, 0, 255]];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Model {
     pub size: [u32; 3],
-    /// Colour of each filled cell, by (x, y, z).
+    /// Color of each filled cell, by (x, y, z).
     pub voxels: BTreeMap<[u32; 3], Rgb>,
 }
 
@@ -47,11 +47,11 @@ impl Model {
         self.size.iter().map(|&side| u64::from(side)).product()
     }
 
-    /// Voxels the game would drop because their colour is pure red, green or blue.
+    /// Voxels the game would drop because their color is pure red, green or blue.
     pub fn keyed(&self) -> usize {
         self.voxels
             .values()
-            .filter(|rgb| KEY_COLOURS.contains(rgb))
+            .filter(|rgb| KEY_COLORS.contains(rgb))
             .count()
     }
 
@@ -131,9 +131,9 @@ impl Model {
             .filter(|p| p.len() >= 1020)
             .ok_or("the .vox file has no palette; open and re-save it in MagicaVoxel")?;
         let mut voxels = BTreeMap::new();
-        for &[x, y, z, colour] in cells.as_chunks::<4>().0 {
-            if colour != 0 {
-                let entry = 4 * (colour as usize - 1);
+        for &[x, y, z, color] in cells.as_chunks::<4>().0 {
+            if color != 0 {
+                let entry = 4 * (color as usize - 1);
                 voxels.insert(
                     [u32::from(x), u32::from(y), u32::from(z)],
                     [palette[entry], palette[entry + 1], palette[entry + 2]],
@@ -150,17 +150,17 @@ impl Model {
         if self.size.iter().any(|&side| side > 256) {
             return Err("MagicaVoxel models are at most 256 voxels per side".into());
         }
-        let mut colours: Vec<Rgb> = Vec::new();
+        let mut colors: Vec<Rgb> = Vec::new();
         let mut cells = Vec::with_capacity(4 * self.voxels.len());
         for (&[x, y, z], rgb) in &self.voxels {
-            let index = colours.iter().position(|c| c == rgb).unwrap_or_else(|| {
-                colours.push(*rgb);
-                colours.len() - 1
+            let index = colors.iter().position(|c| c == rgb).unwrap_or_else(|| {
+                colors.push(*rgb);
+                colors.len() - 1
             });
             cells.extend_from_slice(&[x as u8, y as u8, z as u8, index as u8 + 1]);
         }
-        if colours.len() > 255 {
-            return Err("more than 255 different colours; MagicaVoxel palettes hold 255".into());
+        if colors.len() > 255 {
+            return Err("more than 255 different colors; MagicaVoxel palettes hold 255".into());
         }
         let chunk = |kind: &[u8; 4], body: &[u8]| {
             [
@@ -177,7 +177,7 @@ impl Model {
             .flat_map(|side| side.to_le_bytes())
             .collect();
         let xyzi = [&(self.voxels.len() as u32).to_le_bytes(), cells.as_slice()].concat();
-        let mut rgba: Vec<u8> = colours
+        let mut rgba: Vec<u8> = colors
             .iter()
             .flat_map(|c| [c[0], c[1], c[2], 255])
             .collect();
@@ -204,7 +204,7 @@ impl Model {
 pub(crate) mod tests {
     use super::*;
 
-    /// A 2x1x3 model with two colours and empty cells.
+    /// A 2x1x3 model with two colors and empty cells.
     pub(crate) fn sample() -> Model {
         Model {
             size: [2, 1, 3],
@@ -259,7 +259,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn counts_cells_and_key_colours() {
+    fn counts_cells_and_key_colors() {
         let mut model = sample();
         assert_eq!((model.cells(), model.keyed()), (6, 0));
         model.voxels.insert([0, 0, 1], [0, 255, 0]);
