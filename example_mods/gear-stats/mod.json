@@ -5,7 +5,7 @@
 	"version": "0.1.0",
 	"authors": ["DanBagh"],
 	"loader": ">=0.9.0",
-	"description": "Press K in game for a window that adds up the stats of the gear you have on. Point at a stat to see which items it comes from.",
+	"description": "Press V in game for a menu that adds up the stats of the gear you have on. Point at a stat to see which items it comes from.",
 	"scripts": ["scripts/gear.luau"],
-	"menus": [{ "id": "stats", "key": "K", "slot": "left" }]
+	"menus": [{ "id": "stats", "key": "V", "slot": "left" }]
 }

@@ -19,7 +19,7 @@ Scripts need loader level `0.9.0`, so a mod with scripts sets
 ```json
 {
   "scripts": ["scripts/gear.luau"],
-  "menus": [{ "id": "stats", "key": "K", "slot": "left" }]
+  "menus": [{ "id": "stats", "key": "V", "slot": "left" }]
 }
 ```
 
