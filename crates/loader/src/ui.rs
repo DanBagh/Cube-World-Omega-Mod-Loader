@@ -1243,6 +1243,11 @@ mod game {
             unsafe {
                 let walked = WALKED.swap(false, Ordering::Relaxed);
                 for menu in &self.menus {
+                    // nothing would draw it
+                    if !crate::script::running(&menu.owner) {
+                        self.close(game, menu, "its script stopped", false);
+                        continue;
+                    }
                     if walked {
                         self.close(game, menu, "walked", true);
                     }

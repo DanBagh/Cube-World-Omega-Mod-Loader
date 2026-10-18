@@ -597,6 +597,7 @@ impl Mod {
             text.push_str(" ...");
         }
         log!("{}: script stopped: {text}", self.id);
+        stopped(Some((&self.id, &text)));
         self.failed = true;
     }
 
@@ -685,6 +686,7 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn start(sources: &Sources) -> Runtime {
+        stopped(None);
         let mut ids: Vec<&str> = Vec::new();
         for (owner, ..) in &sources.scripts {
             if !ids.contains(&owner.as_str()) {
@@ -702,6 +704,28 @@ impl Runtime {
 
 thread_local! {
     static RUNTIME: RefCell<Option<Runtime>> = const { RefCell::new(None) };
+}
+
+/// Notes a mod whose scripts stopped, with the first line of why, for the app to show.
+/// None empties the list, as a game starts.
+fn stopped(mod_and_reason: Option<(&str, &str)>) {
+    let Some(home) = crate::HOME.get() else {
+        return;
+    };
+    let path = home.join(crate::STOPPED_NAME);
+    let Some((id, reason)) = mod_and_reason else {
+        let _ = std::fs::write(path, "");
+        return;
+    };
+    let reason = reason.lines().next().unwrap_or_default().replace('\t', " ");
+    let file = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path);
+    if let Ok(mut file) = file {
+        use std::io::Write;
+        let _ = writeln!(file, "{id}\t{reason}");
+    }
 }
 
 /// Starts the scripts. The engine calls it once it is made, on the first frame.
@@ -724,6 +748,17 @@ pub fn frame(seconds: f64) {
             }
         }
     });
+}
+
+/// Whether the scripts of mod `owner` are running: it has some, and they have not stopped.
+pub fn running(owner: &str) -> bool {
+    RUNTIME.with(|runtime| {
+        runtime.try_borrow().is_ok_and(|runtime| {
+            runtime
+                .as_ref()
+                .is_some_and(|r| r.mods.iter().any(|m| m.id == owner && !m.failed))
+        })
+    })
 }
 
 /// Has the script of the mod that owns `menu` handle an event of it.

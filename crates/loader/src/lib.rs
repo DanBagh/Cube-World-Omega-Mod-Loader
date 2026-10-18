@@ -40,6 +40,8 @@ pub static HOME: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::
 pub const HOME_FILE: &str = "cwoml.txt";
 pub const PLAN_NAME: &str = "plan.txt";
 pub const LOG_NAME: &str = "loader.log";
+/// The mods whose scripts stopped in this game, a line of id and reason each, for the app.
+pub const STOPPED_NAME: &str = "script-errors.txt";
 
 #[cfg(windows)]
 mod entry {

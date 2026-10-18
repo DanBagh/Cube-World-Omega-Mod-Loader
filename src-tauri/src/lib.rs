@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
@@ -209,8 +210,20 @@ fn icon(found: &Mod) -> Option<String> {
     ))
 }
 
-fn view(found: &Mod, order: Option<usize>) -> ModView {
+/// The mods whose scripts stopped in the last game, from the data folder `mods_dir` is in.
+fn stopped(mods_dir: &Path) -> BTreeMap<String, String> {
+    mods_dir
+        .parent()
+        .map(loader::stopped_scripts)
+        .unwrap_or_default()
+}
+
+fn view(found: &Mod, order: Option<usize>, stopped: &BTreeMap<String, String>) -> ModView {
     let contents = features::contents(found);
+    let mut warnings = found.warnings.clone();
+    if let Some(reason) = stopped.get(&found.id) {
+        warnings.push(Notice::new("Script stopped in the last game").with("Reason", reason));
+    }
     ModView {
         id: found.id.clone(),
         name: found.name.clone(),
@@ -221,7 +234,7 @@ fn view(found: &Mod, order: Option<usize>) -> ModView {
         enabled: found.enabled,
         order,
         errors: found.errors.clone(),
-        warnings: found.warnings.clone(),
+        warnings,
         contents: contents
             .supported
             .into_iter()
@@ -241,6 +254,7 @@ fn evaluate(mods_dir: &Path, entries: &[Entry]) -> Vec<ModView> {
     profiles::apply(&mut found, entries);
     let game = installed();
     let order = mods::resolve(&mut found, judged(game.as_ref()));
+    let stopped = stopped(mods_dir);
     let mut listed: Vec<usize> = (0..found.len())
         .filter(|&index| entries.iter().any(|entry| entry.id == found[index].id))
         .collect();
@@ -249,7 +263,7 @@ fn evaluate(mods_dir: &Path, entries: &[Entry]) -> Vec<ModView> {
         .into_iter()
         .map(|index| {
             let place = order.iter().position(|&i| i == index).map(|at| at + 1);
-            view(&found[index], place)
+            view(&found[index], place, &stopped)
         })
         .collect()
 }
@@ -301,7 +315,11 @@ fn profiles(paths: State<Paths>) -> Result<ProfileState, String> {
 fn library(paths: State<Paths>) -> Vec<ModView> {
     let mut found = mods::load(&paths.mods());
     found.sort_by_key(|item| item.name.to_lowercase());
-    found.iter().map(|item| view(item, None)).collect()
+    let stopped = stopped(&paths.mods());
+    found
+        .iter()
+        .map(|item| view(item, None, &stopped))
+        .collect()
 }
 
 /// What a profile would look like with `entries`, without saving anything.

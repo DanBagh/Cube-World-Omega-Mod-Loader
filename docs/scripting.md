@@ -81,8 +81,9 @@ scripts. The `cwo` table and the standard libraries are read-only.
 
 A script that raises an error, takes longer than 0.5 seconds to start or 20
 milliseconds for one event, or uses more than 64 MB is stopped. Only that
-mod's scripts stop, the game and other mods go on, and the loader's log
-(`loader.log` in the app's data folder) says why.
+mod's scripts stop, and the game and other mods go on. The app shows why on
+the mod once you are back in it, and the loader's log (`loader.log` in the
+app's data folder) has the whole error.
 
 Everything a script does happens on the game's own thread, once a frame or
 when its menus ask for it, so keep handlers quick.

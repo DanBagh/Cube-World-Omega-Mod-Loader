@@ -342,6 +342,14 @@ watch(browsing, (open) => {
 
 let stopListening = () => {}
 
+// back from the game: what its scripts did shows on the mods. Unsaved changes stay
+async function refreshMods() {
+  if (dirty.value || applying.value) return
+  const state = await api.profiles()
+  if (!dirty.value) mods.value = state.mods
+}
+const onFocus = () => refreshMods().catch(() => {})
+
 onMounted(async () => {
   await attempt(async () => {
     info.value = await api.appInfo()
@@ -359,13 +367,17 @@ onMounted(async () => {
     gameError.value = String(reason)
   }
   await refreshLoader().catch(() => {})
+  window.addEventListener("focus", onFocus)
   stopListening = await getCurrentWebview().onDragDropEvent(({ payload }) => {
     dropping.value = payload.type === "enter" || payload.type === "over"
     if (payload.type === "drop") importZips(payload.paths)
   })
 })
 
-onUnmounted(() => stopListening())
+onUnmounted(() => {
+  stopListening()
+  window.removeEventListener("focus", onFocus)
+})
 </script>
 
 <template>

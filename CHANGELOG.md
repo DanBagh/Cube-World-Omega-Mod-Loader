@@ -10,7 +10,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Scripts: mods can bring Luau scripts, which run in the game in a sandbox of
   their own. A script that errors or runs too long stops, and only its mod's
-  scripts with it.
+  scripts with it. The app shows why on the mod after the game.
 - Menus: scripts can open menus of the game's own kind, with its panels and
   fonts, placed in its menu slots, opened with a key, and tilting with the
   cursor. They draw text, panels and voxels, and can show popups beside them.

@@ -25,6 +25,9 @@ const EARLIER_NAME: &str = "version.dll";
 pub const HOME_FILE: &str = "cwoml.txt";
 /// An export only the loader has. Its name in a file is how the loader is recognized.
 pub const MARKER: &str = "CwomlLoaderInfo";
+/// In the home folder: the mods whose scripts stopped in the last game, a line of id and
+/// reason each. `cwoml-loader` has the same name.
+pub const STOPPED_NAME: &str = "script-errors.txt";
 
 /// The in-game loader as built with this app. None on a system it is not built for.
 pub fn embedded() -> Option<&'static [u8]> {
@@ -132,6 +135,27 @@ pub fn clear(game: &Game, home: &Path) -> Result<bool> {
     Ok(removed)
 }
 
+/// The mods whose scripts stopped in the last game, by id, with the reason. Only from a
+/// game started since the mods were last applied: applying again may have fixed them.
+pub fn stopped_scripts(home: &Path) -> std::collections::BTreeMap<String, String> {
+    let modified = |name: &str| {
+        fs::metadata(home.join(name))
+            .and_then(|m| m.modified())
+            .ok()
+    };
+    let (Some(stopped), Some(planned)) = (modified(STOPPED_NAME), modified(PLAN_NAME)) else {
+        return Default::default();
+    };
+    if stopped < planned {
+        return Default::default();
+    }
+    let text = fs::read_to_string(home.join(STOPPED_NAME)).unwrap_or_default();
+    text.lines()
+        .filter_map(|line| line.split_once('\t'))
+        .map(|(id, reason)| (id.to_owned(), reason.to_owned()))
+        .collect()
+}
+
 /// The Wollay Launcher's executable. It is the only program that can start the game
 /// signed in, so applying mods never starts the game.
 pub fn official_launcher() -> Option<PathBuf> {
@@ -203,6 +227,27 @@ mod tests {
 
     fn fake(version: u8) -> Vec<u8> {
         [b"MZ...".as_slice(), MARKER.as_bytes(), &[0, version]].concat()
+    }
+
+    #[test]
+    fn lists_stopped_scripts_only_from_a_game_since_the_last_apply() {
+        let home = tempfile::tempdir().unwrap();
+        let home = home.path();
+        assert!(stopped_scripts(home).is_empty());
+        fs::write(home.join(PLAN_NAME), "plan").unwrap();
+        fs::write(home.join(STOPPED_NAME), "gear\tgear.luau:3: oops\nbroken\n").unwrap();
+        assert_eq!(
+            stopped_scripts(home),
+            [("gear".to_owned(), "gear.luau:3: oops".to_owned())].into()
+        );
+        // applied again after that game
+        let later = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
+        let plan = fs::File::options()
+            .write(true)
+            .open(home.join(PLAN_NAME))
+            .unwrap();
+        plan.set_modified(later).unwrap();
+        assert!(stopped_scripts(home).is_empty());
     }
 
     #[test]
