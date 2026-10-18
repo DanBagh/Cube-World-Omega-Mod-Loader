@@ -12,6 +12,7 @@ name = "cwoml_loader"
 crate-type = ["cdylib"]
 
 [target.'cfg(windows)'.dependencies]
+mlua = { version = "0.12", features = ["luau"] }
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Globalization",

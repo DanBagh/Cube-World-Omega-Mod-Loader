@@ -18,7 +18,7 @@ use crate::{Error, Result, wine};
 pub const PLAN_VERSION: u32 = 3;
 pub const PLAN_NAME: &str = "plan.txt";
 /// Zero bytes after everything placed in the blob, so code that still carries the length
-/// of a longer original string reads NULs and not a neighbour's text.
+/// of a longer original string reads NULs and not a neighbor's text.
 pub const BLOB_PAD: usize = 16;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,6 +162,47 @@ pub struct Plan {
     pub redirects: BTreeMap<String, PathBuf>,
     /// Ask the loader to write its data area to the log on exit.
     pub dump: bool,
+    pub scripts: Scripts,
+}
+
+/// What the in-game loader's script runtime runs.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Scripts {
+    /// The language the strings are in.
+    pub language: String,
+    /// Each mod's scripts in load order: the mod's id and the script's file.
+    pub files: Vec<(String, PathBuf)>,
+    /// Each mod's strings by key: in `language` where the mod has it, else in English.
+    pub texts: BTreeMap<String, BTreeMap<String, String>>,
+    /// The menus mods declare.
+    pub menus: Vec<Menu>,
+}
+
+/// A menu a mod declares, as the in-game loader needs it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Menu {
+    pub owner: String,
+    pub id: String,
+    pub slot: String,
+    /// Its key's SDL scancode.
+    pub key: Option<u16>,
+    /// What the controls menu calls it.
+    pub label: String,
+}
+
+/// A value as a plan line carries it: no tabs or line breaks of its own.
+pub fn escape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '\t' => out.push_str("\\t"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -255,6 +296,29 @@ impl Plan {
         }
         for (key, source) in &self.redirects {
             let _ = writeln!(out, "redirect\t{key}\t{}", wine::game_path(source));
+        }
+        let scripts = &self.scripts;
+        if !scripts.files.is_empty() || !scripts.texts.is_empty() {
+            let _ = writeln!(out, "language\t{}", scripts.language);
+        }
+        for (owner, file) in &scripts.files {
+            let _ = writeln!(out, "script\t{owner}\t{}", wine::game_path(file));
+        }
+        for menu in &scripts.menus {
+            let key = menu.key.map_or_else(|| "-".to_owned(), |k| k.to_string());
+            let _ = writeln!(
+                out,
+                "menu\t{}\t{}\t{}\t{key}\t{}",
+                menu.owner,
+                menu.id,
+                menu.slot,
+                escape(&menu.label)
+            );
+        }
+        for (owner, texts) in &scripts.texts {
+            for (key, text) in texts {
+                let _ = writeln!(out, "text\t{owner}\t{key}\t{}", escape(text));
+            }
         }
         out.push_str("end\n");
         out
@@ -366,6 +430,7 @@ mod tests {
             modules: vec![module],
             redirects: BTreeMap::from([("sprites/coin.cub".to_owned(), PathBuf::from("coin.cub"))]),
             dump: true,
+            scripts: Scripts::default(),
         };
         let blob = format!("{}4849{}", "00".repeat(16), "00".repeat(16));
         let expected = format!(
@@ -389,6 +454,7 @@ mod tests {
             modules: vec![module],
             redirects: BTreeMap::new(),
             dump: false,
+            scripts: Scripts::default(),
         };
         assert!(
             plan.to_text()

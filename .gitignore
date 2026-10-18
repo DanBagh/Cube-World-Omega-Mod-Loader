@@ -11,3 +11,5 @@ src-tauri/gen/schemas
 !.vscode/settings.json
 .idea
 .DS_Store
+
+*.zip

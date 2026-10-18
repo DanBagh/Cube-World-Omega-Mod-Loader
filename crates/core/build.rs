@@ -38,7 +38,7 @@ fn main() {
     build
         .env_remove("RUSTC_WORKSPACE_WRAPPER")
         .env_remove("CLIPPY_ARGS")
-        .args(["build", "--release", "--package", "cwoml-loader"])
+        .args(["build", "--profile", "loader", "--package", "cwoml-loader"])
         .arg("--target-dir")
         .arg(&target);
     if let Ok(triple) = env::var("TARGET") {
@@ -47,6 +47,6 @@ fn main() {
     let status = build.status().expect("run cargo for the loader");
     assert!(status.success(), "the loader did not build");
     let triple = env::var("TARGET").unwrap_or_default();
-    let dll = target.join(triple).join("release/cwoml_loader.dll");
+    let dll = target.join(triple).join("loader/cwoml_loader.dll");
     fs::copy(&dll, &embedded).unwrap_or_else(|e| panic!("{}: {e}", dll.display()));
 }

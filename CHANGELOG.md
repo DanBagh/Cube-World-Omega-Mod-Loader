@@ -6,6 +6,21 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Scripts: mods can bring Luau scripts, which run in the game in a sandbox of
+  their own. A script that errors or runs too long stops, and only its mod's
+  scripts with it.
+- Menus: scripts can open menus of the game's own kind, with its panels and
+  fonts, placed in its menu slots, opened with a key, and tilting with the
+  cursor. They draw text, panels and voxels, and can show popups beside them.
+- The controls menu lists every mod menu with a key after the game's own
+  controls, and the player can rebind them there like the game's.
+- Strings in `lang/` files, which scripts get in the game's language.
+- The Gear Stats example, in English and German: a window with the stats of
+  the gear the player has on, and a popup per stat listing the items it comes
+  from.
+
 ### Changed
 
 - The Pet Food Labels example labels the food of every creature the game has,
@@ -29,7 +44,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Models by amount on game 0.1.2: every pile of an item showed the model of the
-  first pile the game loaded. The Rupees example shows the right colour for
+  first pile the game loaded. The Rupees example shows the right color for
   each amount again.
 
 ### Removed

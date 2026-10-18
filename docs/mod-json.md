@@ -44,8 +44,8 @@ ignored, and entries apply in the order they are written.
 | `priority`     | A whole number. Only breaks ties, see [Load order](load-order.md).                |
 
 `loader` is the feature level of the loader, not the app's version. The app
-that comes with this guide is at level `0.8.0`. A mod that adds sounds needs
-`">=0.8.0"`. Setting it to the level you tested with is a safe choice: a player
+that comes with this guide is at level `0.9.0`. A mod that adds sounds needs
+`">=0.8.0"`, one with scripts or menus `">=0.9.0"`. Setting it to the level you tested with is a safe choice: a player
 with an older app is then told to update, instead of the mod half working.
 
 `game.releases` lists game versions as the app shows them, such as `"0.1.1"`.
@@ -65,6 +65,8 @@ not load at all. Leave `game` out, or use `"*"`, for any version.
 | `pickupSounds` | [Sounds](sounds.md#pickup-sounds)        |
 | `soundPitch`   | [Sounds](sounds.md#sound-pitch)          |
 | `groundModels` | [Models by amount](ground-models.md)     |
+| `scripts`      | [Scripts and menus](scripting.md)        |
+| `menus`        | [Scripts and menus](scripting.md)        |
 
 A section of the wrong kind, such as a `text` that is not a list, is ignored.
 `code` is not supported yet: a mod that has it still loads, without it.

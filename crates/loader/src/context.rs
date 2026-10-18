@@ -12,7 +12,7 @@
 use std::ffi::c_void;
 
 use crate::plan::MAX_HOOK;
-use crate::stats;
+use crate::{controls, ui};
 
 /// The room the code of one hook takes: the replaced instructions and 40 bytes.
 pub const SPACE: usize = (MAX_HOOK + 40).next_multiple_of(16);
@@ -147,10 +147,15 @@ unsafe fn pickup(context: &mut Context, state: *const c_void) {
 pub fn valid(handler: &str, data: &[u8]) -> bool {
     match handler {
         "pickup-sound" => Pickup::read(data).is_some(),
-        "stats-window" => stats::Layout::read(data).is_some(),
-        "stats-hotkey" => stats::Keys::read(data).is_some(),
-        "stats-walk" => data.is_empty(),
-        "stats-open" => stats::Answer::read(data).is_some(),
+        "ui-frame" => ui::Layout::read(data).is_some(),
+        "ui-hotkey" => ui::gate(data).is_some(),
+        "ui-walk" => data.is_empty(),
+        "ui-open" => ui::Answer::read(data).is_some(),
+        "ui-controls-label" => controls::Label::read(data).is_some(),
+        "ui-controls-key" => controls::actions(data).is_some(),
+        "ui-controls-store" => controls::Store::read(data).is_some(),
+        "ui-controls-open" | "ui-controls-defaults" | "ui-controls-save" => data.is_empty(),
+        "ui-controls-drag" => controls::Drag::read(data).is_some(),
         _ => false,
     }
 }
@@ -166,19 +171,23 @@ pub fn hook(handler: &str, data: &[u8], base: usize) -> Option<*mut Hook> {
     let (run, state): (unsafe fn(&mut Context, *const c_void), *const c_void) = match handler {
         "pickup-sound" => (pickup, leak(Pickup::read(data)?)),
         #[cfg(windows)]
-        "stats-window" => (
-            stats::window,
-            std::ptr::from_ref(stats::Window::new(stats::Layout::read(data)?, base)?).cast(),
+        "ui-frame" => (
+            ui::frame,
+            leak(ui::Hook::new(ui::Layout::read(data)?, base)),
         ),
         #[cfg(windows)]
-        "stats-hotkey" => (
-            stats::hotkey,
-            leak(stats::Hotkey::new(stats::Keys::read(data)?)),
-        ),
+        "ui-hotkey" => (ui::hotkey, leak(ui::gate(data)?)),
         #[cfg(windows)]
-        "stats-walk" => (stats::walked, std::ptr::null()),
+        "ui-walk" => (ui::walked, std::ptr::null()),
         #[cfg(windows)]
-        "stats-open" => (stats::opened, leak(stats::Answer::read(data)?)),
+        "ui-open" => (ui::opened, leak(ui::Answer::read(data)?)),
+        "ui-controls-label" => (controls::label, leak(controls::Label::read(data)?)),
+        "ui-controls-key" => (controls::key, leak(controls::actions(data)?)),
+        "ui-controls-store" => (controls::store, leak(controls::Store::read(data)?)),
+        "ui-controls-open" => (controls::open, std::ptr::null()),
+        "ui-controls-defaults" => (controls::defaults, std::ptr::null()),
+        "ui-controls-save" => (controls::saved, std::ptr::null()),
+        "ui-controls-drag" => (controls::drag, leak(controls::Drag::read(data)?)),
         _ => return None,
     };
     Some(Box::into_raw(Box::new(Hook {

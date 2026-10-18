@@ -1,0 +1,19 @@
+{
+	"title": "AUSRUESTUNG",
+	"controls.stats": "AUSRUESTUNG",
+	"stat.attack": "ANGRIFF",
+	"stat.armor": "RUESTUNG",
+	"stat.health": "LEBEN",
+	"stat.resistance": "WIDERSTAND",
+	"stat.regeneration": "REGENERATION",
+	"stat.critical": "KRITISCH",
+	"stat.haste": "TEMPO",
+	"short.attack": "ANG",
+	"short.armor": "RST",
+	"short.health": "LP",
+	"short.resistance": "WID",
+	"short.regeneration": "REG",
+	"short.critical": "KRT",
+	"short.haste": "TMP",
+	"none": "KEIN GEGENSTAND GIBT DIES"
+}

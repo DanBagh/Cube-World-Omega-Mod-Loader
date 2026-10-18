@@ -1,0 +1,19 @@
+{
+	"title": "GEAR STATS",
+	"controls.stats": "GEAR STATS MENU",
+	"stat.attack": "ATTACK",
+	"stat.armor": "ARMOR",
+	"stat.health": "HEALTH",
+	"stat.resistance": "RESISTANCE",
+	"stat.regeneration": "REGENERATION",
+	"stat.critical": "CRITICAL",
+	"stat.haste": "HASTE",
+	"short.attack": "ATK",
+	"short.armor": "DEF",
+	"short.health": "HP",
+	"short.resistance": "RES",
+	"short.regeneration": "REG",
+	"short.critical": "CRT",
+	"short.haste": "HST",
+	"none": "NO GEAR ADDS THIS"
+}

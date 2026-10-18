@@ -78,6 +78,33 @@ pub struct Plan {
     pub modules: Vec<Module>,
     /// Game-relative path, lowercase with forward slashes, to the file served in its place.
     pub redirects: Vec<(String, String)>,
+    /// The language the strings are in, each mod's scripts in load order as the mod's id
+    /// and the file, and each mod's strings as the mod's id, the key and the text.
+    pub language: Option<String>,
+    pub scripts: Vec<(String, String)>,
+    pub texts: Vec<(String, String, String)>,
+    /// The menus mods declare.
+    pub menus: Vec<crate::ui::Declared>,
+}
+
+/// A value as a plan line carries it, back to what it was.
+pub fn unescape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('t') => out.push('\t'),
+            Some('n') => out.push('\n'),
+            Some('r') => out.push('\r'),
+            Some(other) => out.push(other),
+            None => out.push('\\'),
+        }
+    }
+    out
 }
 
 fn hex(text: &str) -> Option<u32> {
@@ -215,6 +242,23 @@ pub fn parse(text: &str) -> Result<Plan, &'static str> {
             ["redirect", key, target, ..] => {
                 plan.redirects.push((key.to_owned(), target.to_owned()))
             }
+            ["language", language, ..] => plan.language = Some(language.to_owned()),
+            ["menu", owner, id, slot, key, ref rest @ ..] => {
+                if let Some(slot) = crate::ui::Slot::named(slot) {
+                    plan.menus.push(crate::ui::Declared {
+                        owner: owner.to_owned(),
+                        id: id.to_owned(),
+                        slot,
+                        key: key.parse().ok(),
+                        label: rest.first().map(|l| unescape(l)).unwrap_or_default(),
+                    });
+                }
+            }
+            ["script", owner, file, ..] => plan.scripts.push((owner.to_owned(), file.to_owned())),
+            ["text", owner, key, text, ..] => {
+                plan.texts
+                    .push((owner.to_owned(), key.to_owned(), unescape(text)))
+            }
             [
                 "rel32" | "ptr64" | "bytes" | "hook" | "blobrel32" | "context",
                 ..,
@@ -290,10 +334,66 @@ mod tests {
             modules: vec![module],
             redirects: BTreeMap::from([("sprites/coin.cub".to_owned(), "C:/mods/coin.cub".into())]),
             dump: true,
+            scripts: written::Scripts {
+                language: "de".into(),
+                files: vec![("gear".into(), "C:/mods/gear/main.luau".into())],
+                texts: BTreeMap::from([(
+                    "gear".to_owned(),
+                    BTreeMap::from([("title".to_owned(), "TAB\there\nAND \\ BACK".to_owned())]),
+                )]),
+                menus: vec![
+                    written::Menu {
+                        owner: "gear".into(),
+                        id: "stats".into(),
+                        slot: "left".into(),
+                        key: Some(14),
+                        label: "GEAR\tSTATS".into(),
+                    },
+                    written::Menu {
+                        owner: "gear".into(),
+                        id: "help".into(),
+                        slot: "center".into(),
+                        key: None,
+                        label: String::new(),
+                    },
+                ],
+            },
         };
 
         let read = parse(&plan.to_text()).unwrap();
         assert_eq!((read.release.as_deref(), read.dump), (Some("gh-1"), true));
+        assert_eq!(read.language.as_deref(), Some("de"));
+        assert_eq!(
+            read.menus,
+            [
+                crate::ui::Declared {
+                    owner: "gear".into(),
+                    id: "stats".into(),
+                    slot: crate::ui::Slot::Left,
+                    key: Some(14),
+                    label: "GEAR\tSTATS".into(),
+                },
+                crate::ui::Declared {
+                    owner: "gear".into(),
+                    id: "help".into(),
+                    slot: crate::ui::Slot::Center,
+                    key: None,
+                    label: String::new(),
+                },
+            ]
+        );
+        assert_eq!(
+            read.scripts,
+            [("gear".to_owned(), "C:/mods/gear/main.luau".to_owned())]
+        );
+        assert_eq!(
+            read.texts,
+            [(
+                "gear".to_owned(),
+                "title".to_owned(),
+                "TAB\there\nAND \\ BACK".to_owned()
+            )]
+        );
         assert_eq!(
             read.redirects,
             [("sprites/coin.cub".to_owned(), "C:/mods/coin.cub".to_owned())]

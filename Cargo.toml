@@ -18,3 +18,8 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# the in-game loader: Luau raises script errors through it, which needs unwinding
+[profile.loader]
+inherits = "release"
+panic = "unwind"

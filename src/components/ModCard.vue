@@ -48,7 +48,8 @@ const groups: [string, Record<string, [string, string]>][] = [
     },
   ],
   ["Files", { files: ["other file", "other files"] }],
-  ["Windows", { statsWindow: ["stats window", "stats windows"] }],
+  ["Menus", { menus: ["menu", "menus"] }],
+  ["Scripts", { scripts: ["script", "scripts"] }],
 ]
 
 const tags = computed(() => {

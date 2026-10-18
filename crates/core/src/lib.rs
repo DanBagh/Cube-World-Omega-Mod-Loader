@@ -1,6 +1,6 @@
 //! Mod loading for Cube World Omega.
 //!
-//! Mods are read and ordered (`mods`), the client DLLs are analysed (`pe`, `refs`), and
+//! Mods are read and ordered (`mods`), the client DLLs are analyzed (`pe`, `refs`), and
 //! each kind of mod content (`features`) turns into self-verifying memory patches in a
 //! `plan` that the in-game loader applies at startup. The game's own files are never
 //! changed. The one thing put into the game folder is that loader (`loader`).
@@ -29,4 +29,4 @@ mod testing;
 pub use error::{Error, Result};
 
 /// Manifest feature level this loader implements. Mods ask for a minimum with `"loader"`.
-pub const LOADER_VERSION: &str = "0.8.0";
+pub const LOADER_VERSION: &str = "0.9.0";

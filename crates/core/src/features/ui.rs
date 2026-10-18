@@ -1,14 +1,16 @@
-//! The stats window: the `"statsWindow"` manifest section.
+//! Menus for mods: the `"menus"` manifest section, and the hooks the in-game loader
+//! draws them with.
 //!
-//! A window of the game's own kind that a key opens and closes, listing what the
-//! equipped gear adds up to, stat by stat, as the game's tooltips name them. The in-game
-//! loader draws it with the client's own functions and has it act like the inventory:
-//! it tilts with the cursor, gives way to the other windows, closes as the player starts
-//! to move, and counts as an open window wherever the client asks, which frees the
-//! cursor. Context hooks do that, see the in-game loader's `stats`. The last mod to set the section decides the key and the title.
+//! A mod declares its menus, each with an id, the slot it goes in and a key that opens
+//! and closes it, and its scripts draw them (see `scripts`). The in-game loader makes
+//! them menus of the game's own kind: it places them in the game's slots, tilts them
+//! with the cursor, closes them as the player starts to move or another menu takes
+//! their place, and has them count as open menus wherever the client asks, which frees
+//! the cursor. These hooks are planned whenever a mod has scripts, as the runtime starts
+//! from the frame one.
 //!
-//! Build-specific: every function and offset the window needs is read from the code that
-//! uses it, the controls window and the HP bar for the most part. See `Found`.
+//! Build-specific: every function and offset the in-game loader needs is read from the
+//! code that uses it, the controls menu and the HP bar for the most part. See `Found`.
 
 use regex::bytes::Captures;
 use serde_json::Value;
@@ -16,23 +18,24 @@ use serde_json::Value;
 use super::ModuleBuild;
 use super::stub::signature;
 use crate::mods::{Mod, Notice};
-use crate::plan::{Claim, Group, Op};
+use crate::plan::{Claim, Group, Op, Scripts};
 use crate::report::{Report, one_line};
 
-/// The longest title. The in-game loader takes no more.
-pub const MAX_TITLE: usize = 24;
-const DEFAULT_TITLE: &str = "GEAR STATS";
+/// The slots a menu can go in, the longest menu id, and the most menus.
+const SLOTS_NAMED: [&str; 2] = ["left", "center"];
+const MAX_ID: usize = 32;
+const MAX_MENUS: usize = 16;
 /// Gear slots, and the size of an item in them: what the tooltips copy of the gear.
 const SLOTS: u8 = 10;
 const ITEM_SIZE: u8 = 0x14;
 
 // mov rax,[game] / (v)movss xmm,[rax+ui scale] / (v)mulss xmm3,[factor] / pos, rotation,
-// z 8.0, valign 1 / call move_2d: a centred window placing itself. The controls window
+// z 8.0, valign 1 / call move_2d: a centered menu placing itself. The controls menu
 // and one other do
 const PLACE: &str = r"\x48\x8b\x05(....)(?:\xc5\xfa\x10|\xf3\x0f\x10)[\x80-\xbf](....)(?:\xc5\xfa\x59|\xf3\x0f\x59)[\x05\x0d\x15\x1d](....)\x48\xc7\x44\x24.\x00\x00\x00\x00\xc7\x44\x24.\x00\x00\x00\x00\x48\xc7\x44\x24.\x00\x00\x00\x00\xc7\x44\x24.\x00\x00\x00\x41\xc7\x44\x24\x20\x01\x00\x00\x00\x48\x8d\x54\x24.\x4c\x8d\x44\x24.(?:\x48\x89[\xc0-\xff])?\xe8(....)";
 // call <place fn> / mov rax,[rbp+N] / lea rcx,[rax+M] / call <place fn>: once a frame
 const FRAME: &str = r"\xe8(....)(\x48\x8b\x85....)\x48\x8d\x88....\xe8(....)";
-// a 236x180 window's constructor: background frame, commit it, build the rest
+// a 236x180 menu's constructor: background frame, commit it, build the rest
 const CONSTRUCTOR: &str = r"\xc7\x44\x24\x28\xb4\x00\x00\x00\xc7\x44\x24\x20\xec\x00\x00\x00\x48\x89\xf1\x31\xd2\x45\x31\xc0\x45\x31\xc9\xe8(....)\x48\x89\xf1\xe8(....)\x48\x89\xf1\xe8(....)";
 // and in its build: the panel, a glyph of the font, and the commit before the epilogue
 const PANEL: &str = r"\xc7\x44\x24\x28\xb4\x00\x00\x00\xc7\x44\x24\x20\xec\x00\x00\x00\x48\x89[\xc0-\xff]\x31\xd2\x45\x31\xc0\x45\x31\xc9\xe8(....)";
@@ -56,74 +59,74 @@ const STAT: &str =
 // mov r15,[game] / mov rcx,r15 / call check / lea rcx,[r15+alt] / add r15,gear / test
 // al,al / cmove r15,rcx, then the gear is copied: the tooltips' gear
 const GEAR: &str = r"\x4c\x8b\x3d(....)\x4c\x89\xf9\xe8(....)\x49\x8d\x8f(....)\x49\x81\xc7(....)\x84\xc0\x4c\x0f\x44\xf9(?:\xc4\xc1\x7c\x10\x07|.{0,6}\x41\xb8\xc8\x00\x00\x00)";
-// movzx eax,[rsp+N] / cmp al,1 / jne / cmp byte [rcx+M],1: the window hotkeys, when on
+// movzx eax,[rsp+N] / cmp al,1 / jne / cmp byte [rcx+M],1: the menu hotkeys, when on
 const HOTKEYS: &str = r"\x0f\xb6\x44\x24(.)\x3c\x01\x0f\x85....\x80\x79(.)\x01";
-// cmp byte [rcx+key],1 / jne / maybe lea of the window / test byte [rsi+flag],1: a
-// window's key, then whether that window is open. KEY stands for the key's byte
-const KEY_WINDOW: &str = r"\x80\x79KEY\x01(?:\x75.|\x0f\x85....)(?:[\x48\x4c]\x8d[\x80-\xbf]....)?[\x40-\x4f]?\xf6(?:\x84\x24|[\x80-\x87])(....)\x01";
+// cmp byte [rcx+key],1 / jne / maybe lea of the menu / test byte [rsi+flag],1: a
+// menu's key, then whether that menu is open. KEY stands for the key's byte
+const KEY_MENU: &str = r"\x80\x79KEY\x01(?:\x75.|\x0f\x85....)(?:[\x48\x4c]\x8d[\x80-\xbf]....)?[\x40-\x4f]?\xf6(?:\x84\x24|[\x80-\x87])(....)\x01";
 // shl rax,4 / lea rcx,[names] / mov reg,[rax+rcx]: an item's name by its type, English
 // then German, 16 bytes a type
 const NAMES: &str = r"\x48\xc1\xe0\x04\x48\x8d\x0d(....)[\x48\x4c]\x8b[\x04-\x3c]\x08";
 // mov eax,[reg+rarity] / divide by 5 / dec eax / cmp eax,3 / ja / then the red, green and
-// blue of each of the 4 rarities from their tables: an item's name in its rarity's colour.
+// blue of each of the 4 rarities from their tables: an item's name in its rarity's color.
 // Some read an item that sits 4 bytes into a record, so the smallest offset is the item's
 const RARITY: &str = r"\x8b[\x40-\x7f](.)\xb9\xcd\xcc\xcc\xcc\x48\x0f\xaf\xc1\x48\xc1\xe8\x22\xff\xc8.{0,24}?\x83\xf8\x03\x77.{1,8}?\x48\x8d\x0d(....).{4,6}?\x48\x8d\x0d(....).{4,6}?\x48\x8d\x0d(....)";
-// mov rcx,rsi / call notice / mov dx,63h: a window has opened, and the client notes
+// mov rcx,rsi / call notice / mov dx,63h: a menu has opened, and the client notes
 // whether the player was moving then, in the flag the function sets
 const NOTICE: &str = r"\x48\x89\xf1\xe8(....)\x66\xba\x63\x00";
 const NOTICE_SETS: &str = r"\x66\xc7\x81(....)\x01\x00";
 // call moving / test al,al / je / test byte [rsi+flag],1 / jne / movzx: the player has
-// started to move since the windows opened, and the client closes them
+// started to move since the menus opened, and the client closes them
 const WALK: &str =
     r"\xe8....\x84\xc0\x0f\x84....\xf6\x86(....)\x01\x0f\x85....(\x0f\xb6[\x80-\xbf]....)";
-// test byte [rsi+flag],1 / je / lea rcx,[rsi+window] / call close: the hotkeys closing a
-// window that is open
+// test byte [rsi+flag],1 / je / lea rcx,[rsi+menu] / call close: the hotkeys closing a
+// menu that is open
 const CLOSER: &str = r"[\x40-\x4f]?\xf6(?:\x84\x24|[\x80-\x87])(....)\x01\x74.[\x48\x49]\x8d(?:\x8c\x24|[\x88-\x8f])(....)\xe8(....)";
 /// How far into the hotkey handler its closes are looked for.
 const CLOSERS_WITHIN: usize = 0x1000;
-/// The skills window's key, after the inventory's.
+/// The skills menu's key, after the inventory's.
 const SKILLS_AFTER_INVENTORY: u8 = 4;
-// lea rdx,[rsp+N] / call: early in the controls window's update, where the cursor is on it
+// lea rdx,[rsp+N] / call: early in the controls menu's update, where the cursor is on it
 const LOCAL: &str = r"\x48\x8d\x54\x24.\xe8(....)";
-/// How far into a window's update the cursor is looked for.
+/// How far into a menu's update the cursor is looked for.
 const LOCAL_WITHIN: usize = 0x60;
-// mov dx,63h ... call: the sound of a window opening, after it
+// mov dx,63h ... call: the sound of a menu opening, after it
 const OPEN: &str = r"\x66\xba\x63\x00.{0,24}?\xe8(....)";
 /// How far after the hotkey test the open sound is looked for.
 const SOUND_AFTER: usize = 0x200;
 // mov rcx,[r9+mouse] (or through r12) / test / je / mov rax,[rcx] / lea rdx,[rbp+N] / call
-// [rax+slot] ... mov eax,[width] ... mov esi,[height]: a window tilting with the cursor
+// [rax+slot] ... mov eax,[width] ... mov esi,[height]: a menu tilting with the cursor
 const MOUSE: &str = r"(?:\x49\x8b\x89|\x49\x8b\x8c\x24)(....)\x48\x85\xc9\x0f\x84....\x48\x8b\x01\x48\x8d\x95....\xff\x50(.).{0,40}?\x8b\x05(....).{0,40}?\x8b\x35(....)";
 // and its scale: (v)mulss xmm3,[factor], or movss xmm3,[factor] / mulss xmm3,xmmN, then
 // valign 1
 const SCALE: &str = r"(?:\xc5[\x80-\xff]\x59\x1d(....)|\xf3\x0f\x10\x1d(....)\xf3\x41?\x0f\x59[\xc0-\xff])\xc7\x44\x24\x20\x01\x00\x00\x00";
-/// How far after where it reads the cursor a tilting window's scale is looked for.
+/// How far after where it reads the cursor a tilting menu's scale is looked for.
 const TILTING: usize = 0x400;
-// the window settings in a row: ui scale, one more, the tilt, one more
+// the menu settings in a row: ui scale, one more, the tilt, one more
 const SETTINGS: &str = r"(?:\xc4\xc1\x7a\x10[\x80-\xbf]|\xf3?\x41\x0f\x10(?:\x84\x24|[\x80-\xbf]))(....).{0,20}?(?:\xc4\xc1\x7a\x10[\x80-\xbf]|\xf3?\x41\x0f\x10(?:\x84\x24|[\x80-\xbf]))(....).{0,20}?(?:\xc4\xc1\x7a\x10[\x80-\xbf]|\xf3?\x41\x0f\x10(?:\x84\x24|[\x80-\xbf]))(....).{0,20}?(?:\xc4\xc1\x7a\x10[\x80-\xbf]|\xf3?\x41\x0f\x10(?:\x84\x24|[\x80-\xbf]))(....)";
 // lea r12,[font] / lea rcx,[rbp+N] / lea r8,[rbp+M] / mov rdx,r12: the inventory's title
 // font
 const TITLE_FONT: &str = r"\x4c\x8d\x25(....)\x48\x8d\x4d.\x4c\x8d\x85....\x4c\x89\xe2";
 // cmp bl,1 / mov rcx,rsi / jne / cmp byte [rcx+was],0 / jne / cmp byte [rcx+system],1 /
 // jne / mov rcx,rsi / call close_top: the system menu's flag, and the client closing its
-// top window
+// top menu
 const CLOSE_TOP: &str = r"\x80\xfb\x01\x48\x89\xf1\x75.\x80\xb9....\x00\x75.\x80\xb9(....)\x01\x75.\x48\x89\xf1\xe8(....)";
 // test byte [reg+flag],1 (or cmp byte [reg+flag],0 or 1) / jne, over and over, then the
 // system menu's flag: cmp byte [reg+system],0 or 1, or movzx eax,byte [reg+system]. The
-// client asking whether any window is open, wherever it does. SYSTEM stands for the
+// client asking whether any menu is open, wherever it does. SYSTEM stands for the
 // system menu flag's offset
 const CHAIN: &str = r"((?:(?:[\x40-\x4f]?\xf6(?:\x84\x24|[\x80-\x8f])....\x01|[\x40-\x4f]?\x80(?:\xbc\x24|[\xb8-\xbf])....[\x00\x01])(?:\x75.|\x0f\x85....)(?:\xb0\x01)?){8,}?)([\x40-\x4f]?(?:\x80(?:\xbc\x24|[\xb8-\xbf])SYSTEM([\x00\x01])|\x0f\xb6(?:\x84\x24|[\x80-\xbf])SYSTEM))";
 const OPEN_FLAG: &str = r"\xf6(?:\x84\x24|[\x80-\x8f])(....)\x01";
 // cmp byte [rcx+base],1 / jne / mov byte [rcx+base],0 / jmp hide: a bar hiding itself
 const HIDE: &str = r"\x80\xb9(....)\x01\x75.\xc6\x81(....)\x00\xe9(....)";
 
+/// A menu a mod declares.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Window {
-    pub key: String,
-    /// The SDL scancode of the key.
-    pub scancode: u16,
-    pub title: String,
+pub struct Declared {
     pub owner: String,
+    pub id: String,
+    pub slot: String,
+    pub key: Option<Key>,
 }
 
 /// The SDL scancode of a key: a letter, a digit or F1 to F12.
@@ -141,59 +144,100 @@ pub fn scancode(key: &str) -> Option<u16> {
     }
 }
 
-fn parse(section: &Value) -> Result<(String, u16, String), String> {
-    let section = section.as_object().ok_or("statsWindow is an object")?;
-    let key = section
-        .get("key")
+/// A key as a mod names it, and its SDL scancode.
+type Key = (String, u16);
+
+fn parse(entry: &Value) -> Result<(String, String, Option<Key>), String> {
+    let entry = entry.as_object().ok_or("a menu is an object")?;
+    let id = entry
+        .get("id")
         .and_then(Value::as_str)
-        .ok_or("key is missing")?;
-    let code = scancode(key).ok_or("key is a letter, a digit or F1 to F12")?;
-    let title = match section.get("title") {
-        None | Some(Value::Null) => DEFAULT_TITLE.to_owned(),
-        Some(title) => {
-            let title = title.as_str().ok_or("title is text")?.to_ascii_uppercase();
-            if title.len() > MAX_TITLE || !title.chars().all(|c| (' '..='~').contains(&c)) {
-                return Err(format!("title is at most {MAX_TITLE} plain characters"));
-            }
-            title
+        .ok_or("id is missing")?;
+    let plain = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_';
+    if id.is_empty() || id.len() > MAX_ID || !id.chars().all(plain) {
+        return Err(format!(
+            "id is up to {MAX_ID} lowercase letters, digits, - and _"
+        ));
+    }
+    let slot = match entry.get("slot") {
+        None | Some(Value::Null) => "left",
+        Some(slot) => {
+            let slot = slot.as_str().unwrap_or_default();
+            SLOTS_NAMED
+                .into_iter()
+                .find(|s| *s == slot)
+                .ok_or_else(|| format!("slot is one of {}", SLOTS_NAMED.join(", ")))?
         }
     };
-    Ok((key.to_ascii_uppercase(), code, title))
+    let key = match entry.get("key") {
+        None | Some(Value::Null) => None,
+        Some(key) => {
+            let key = key.as_str().ok_or("key is text")?;
+            let code = scancode(key).ok_or("key is a letter, a digit or F1 to F12")?;
+            Some((key.to_ascii_uppercase(), code))
+        }
+    };
+    Ok((id.to_owned(), slot.to_owned(), key))
 }
 
-/// The window the last mod that has one asks for.
-pub fn collect(mods: &mut [Mod], order: &[usize], report: &mut Report) -> Option<Window> {
-    let mut chosen: Option<Window> = None;
+/// The menus the loading mods declare. A key two menus ask for goes to the one that
+/// loads later.
+pub fn collect(mods: &mut [Mod], order: &[usize], report: &mut Report) -> Vec<Declared> {
+    let mut declared: Vec<Declared> = Vec::new();
     for &index in order {
         let found = &mut mods[index];
-        let Some(section) = found.manifest.get("statsWindow").filter(|v| !v.is_null()) else {
-            continue;
-        };
-        let (key, scancode, title) = match parse(section) {
-            Ok(parsed) => parsed,
-            Err(reason) => {
+        let scripted = !found.list("scripts").is_empty();
+        for entry in found.list("menus").to_vec() {
+            let parsed = parse(&entry).and_then(|parsed| {
+                let taken = declared
+                    .iter()
+                    .any(|w| w.owner == found.id && w.id == parsed.0);
+                if taken {
+                    Err(format!("the mod has two menus called '{}'", parsed.0))
+                } else if declared.len() >= MAX_MENUS {
+                    Err(format!("the game has room for {MAX_MENUS} menus from mods"))
+                } else {
+                    Ok(parsed)
+                }
+            });
+            let (id, slot, key) = match parsed {
+                Ok(parsed) => parsed,
+                Err(reason) => {
+                    found.warnings.push(
+                        Notice::new("Menu ignored")
+                            .with("Entry", one_line(&entry.to_string(), 70))
+                            .with("Reason", reason),
+                    );
+                    continue;
+                }
+            };
+            if !scripted {
                 found.warnings.push(
-                    Notice::new("Stats window ignored")
-                        .with("Entry", one_line(&section.to_string(), 70))
-                        .with("Reason", reason),
+                    Notice::new("Menu without a script")
+                        .with("Menu", &id)
+                        .with("Reason", "no script of the mod draws it"),
                 );
-                continue;
             }
-        };
-        if let Some(earlier) = &chosen {
-            report.warn(format!(
-                "stats window set by both {} and {}; {} wins",
-                earlier.owner, found.id, found.id
-            ));
+            if let Some((name, code)) = &key {
+                for earlier in declared.iter_mut() {
+                    if earlier.key.as_ref().is_some_and(|(_, c)| c == code) {
+                        report.warn(format!(
+                            "key {name} is asked for by {}'s menu {} and {}'s menu {id}; {} gets it",
+                            earlier.owner, earlier.id, found.id, found.id
+                        ));
+                        earlier.key = None;
+                    }
+                }
+            }
+            declared.push(Declared {
+                owner: found.id.clone(),
+                id,
+                slot,
+                key,
+            });
         }
-        chosen = Some(Window {
-            key,
-            scancode,
-            title,
-            owner: found.id.clone(),
-        });
     }
-    chosen
+    declared
 }
 
 /// What the in-game loader is told about a client.
@@ -203,7 +247,7 @@ struct Found {
     /// handled.
     frame: (u32, Vec<u8>),
     hotkeys: (u32, Vec<u8>),
-    /// Where the client asks whether a window is open, and how each answers: 0 as a
+    /// Where the client asks whether a menu is open, and how each answers: 0 as a
     /// value, 1 or 2 by comparing to 1 or to 0.
     asks: Vec<((u32, Vec<u8>), u8)>,
     /// Where the hotkey handler keeps on its stack whether hotkeys work.
@@ -211,14 +255,14 @@ struct Found {
     sound: u32,
     close_top: u32,
     system: u32,
-    windows: Vec<u32>,
-    /// The windows that may stay open with this one: the inventory.
+    menus: Vec<u32>,
+    /// The menus that may stay open with this one: the inventory.
     keep: Vec<u32>,
-    /// The windows of the slot this one takes, crafting and skills: each one's open flag,
+    /// The menus of the slot this one takes, crafting and skills: each one's open flag,
     /// where it is in the game object, and its close.
     slot: Vec<[u32; 3]>,
-    /// `notice(game)`: notes whether the player is moving as a window opens. And where
-    /// the client closes its windows as the player starts to move.
+    /// `notice(game)`: notes whether the player is moving as a menu opens. And where
+    /// the client closes its menus as the player starts to move.
     notice: u32,
     walk: (u32, Vec<u8>),
     hide: u32,
@@ -227,10 +271,10 @@ struct Found {
     local: u32,
     names: u32,
     name_count: u32,
-    /// Where an item keeps its rarity, and the colours of rarities 1 to 4, red, green and
+    /// Where an item keeps its rarity, and the colors of rarities 1 to 4, red, green and
     /// blue in turn.
     rarity: u32,
-    rarity_colours: [u32; 12],
+    rarity_colors: [u32; 12],
     game: u32,
     ui_scale: u32,
     scale: f32,
@@ -285,7 +329,7 @@ fn find(module: &ModuleBuild) -> Option<Found> {
     };
     let constant = |rva: u32| Some(u32::from_le_bytes(image.read(rva, 4)?.try_into().ok()?));
 
-    // the windows that place themselves: game, ui scale, factor, move_2d
+    // the menus that place themselves: game, ui scale, factor, move_2d
     let places: Vec<(u32, (u32, u32, u32, u32))> = signature(PLACE)
         .captures_iter(text)
         .filter_map(|hit| {
@@ -303,7 +347,7 @@ fn find(module: &ModuleBuild) -> Option<Found> {
         (placing(rel_of(&hit, 1)?) && placing(rel_of(&hit, 3)?)).then(|| replaced(&hit, 2))?
     }))?;
 
-    // the windows that tilt with the cursor: where it is, the screen, their scale
+    // the menus that tilt with the cursor: where it is, the screen, their scale
     let tilting: Vec<_> = signature(MOUSE)
         .captures_iter(text)
         .filter_map(|hit| {
@@ -327,7 +371,7 @@ fn find(module: &ModuleBuild) -> Option<Found> {
             .filter_map(|hit| (u32_of(&hit, 1)? == ui_scale).then(|| u32_of(&hit, 3))?),
     )?;
 
-    // the constructors of 236x180 windows, and in their builds what they draw with
+    // the constructors of 236x180 menus, and in their builds what they draw with
     let builds: Vec<_> = signature(CONSTRUCTOR)
         .captures_iter(text)
         .filter_map(|hit| {
@@ -391,19 +435,19 @@ fn find(module: &ModuleBuild) -> Option<Found> {
                 h.get(2)?.as_bytes()[0],
             ))
         }))?;
-    // the window of each key, the crafting key following the inventory's
-    let window_of = |key: u8| {
-        let pattern = KEY_WINDOW.replace("KEY", &format!(r"\x{key:02x}"));
+    // the menu of each key, the crafting key following the inventory's
+    let menu_of = |key: u8| {
+        let pattern = KEY_MENU.replace("KEY", &format!(r"\x{key:02x}"));
         agreed(
             signature(&pattern)
                 .captures_iter(text)
                 .filter_map(|h| u32_of(&h, 1)),
         )
     };
-    let keep = vec![window_of(inventory_key)?];
+    let keep = vec![menu_of(inventory_key)?];
     let slot_flags = [
-        window_of(inventory_key.checked_add(1)?)?,
-        window_of(inventory_key.checked_add(SKILLS_AFTER_INVENTORY)?)?,
+        menu_of(inventory_key.checked_add(1)?)?,
+        menu_of(inventory_key.checked_add(SKILLS_AFTER_INVENTORY)?)?,
     ];
     let handler = text.get(at..text.len().min(at + CLOSERS_WITHIN))?;
     let closers: Vec<[u32; 3]> = signature(CLOSER)
@@ -460,9 +504,9 @@ fn find(module: &ModuleBuild) -> Option<Found> {
             .captures_iter(text)
             .filter_map(|h| Some((u32_of(&h, 1)?, rel_of(&h, 2)?))),
     )?;
-    // the windows that close this one are those every ask tests
+    // the menus that close this one are those every ask tests
     let mut asks = Vec::new();
-    let mut windows: Option<Vec<u32>> = None;
+    let mut menus: Option<Vec<u32>> = None;
     let system_bytes: String = system
         .to_le_bytes()
         .iter()
@@ -474,36 +518,36 @@ fn find(module: &ModuleBuild) -> Option<Found> {
             .captures_iter(hit.get(1)?.as_bytes())
             .filter_map(|flag| u32_of(&flag, 1))
             .collect();
-        windows = Some(match windows {
+        menus = Some(match menus {
             None => tested,
             Some(both) => both.into_iter().filter(|w| tested.contains(w)).collect(),
         });
         asks.push((replaced(&hit, 2)?, compared.map_or(0, |value| 2 - value)));
     }
-    let windows = windows?;
+    let menus = menus?;
     let rarities: Vec<(u8, [u32; 12])> = signature(RARITY)
         .captures_iter(text)
         .filter_map(|h| {
-            let mut colours = [0u32; 12];
+            let mut colors = [0u32; 12];
             for (channel, group) in (2..5).enumerate() {
                 let table = rel_of(&h, group)?;
                 for rarity in 0..4 {
-                    colours[channel * 4 + rarity] = constant(table + 4 * rarity as u32)?;
+                    colors[channel * 4 + rarity] = constant(table + 4 * rarity as u32)?;
                 }
             }
-            Some((h.get(1)?.as_bytes()[0], colours))
+            Some((h.get(1)?.as_bytes()[0], colors))
         })
         .collect();
-    let rarity_colours = agreed(rarities.iter().map(|r| r.1))?;
+    let rarity_colors = agreed(rarities.iter().map(|r| r.1))?;
     let rarity = u32::from(rarities.iter().map(|r| r.0).min()?);
-    if !keep.iter().all(|k| windows.contains(k)) {
+    if !keep.iter().all(|k| menus.contains(k)) {
         return None;
     }
     let hide = agreed(signature(HIDE).captures_iter(text).filter_map(|h| {
         (u32_of(&h, 1)? == base && u32_of(&h, 2)? == base).then(|| rel_of(&h, 3))?
     }))?;
 
-    (gear_game == game && !windows.is_empty() && asks.len() >= 2).then_some(Found {
+    (gear_game == game && !menus.is_empty() && asks.len() >= 2).then_some(Found {
         frame,
         hotkeys,
         asks,
@@ -511,7 +555,7 @@ fn find(module: &ModuleBuild) -> Option<Found> {
         sound,
         close_top,
         system,
-        windows,
+        menus,
         keep,
         slot,
         notice,
@@ -521,7 +565,7 @@ fn find(module: &ModuleBuild) -> Option<Found> {
         names,
         name_count,
         rarity,
-        rarity_colours,
+        rarity_colors,
         game,
         ui_scale,
         scale: f32::from_bits(scale),
@@ -550,8 +594,8 @@ fn find(module: &ModuleBuild) -> Option<Found> {
     })
 }
 
-/// The `stats-window` handler's data, in the order the in-game loader reads it.
-fn layout(found: &Found, title: &str) -> Vec<u8> {
+/// The `ui-frame` handler's data, in the order the in-game loader reads it.
+fn layout(found: &Found) -> Vec<u8> {
     let mut data = Vec::new();
     let words = |data: &mut Vec<u8>, values: &[u32]| {
         for value in values {
@@ -608,56 +652,67 @@ fn layout(found: &Found, title: &str) -> Vec<u8> {
             found.notice,
         ],
     );
-    words(&mut data, &found.rarity_colours);
-    data.push(found.windows.len() as u8);
-    words(&mut data, &found.windows);
+    words(&mut data, &found.rarity_colors);
+    data.push(found.menus.len() as u8);
+    words(&mut data, &found.menus);
     data.push(found.keep.len() as u8);
     words(&mut data, &found.keep);
     data.push(found.slot.len() as u8);
-    for window in &found.slot {
-        words(&mut data, window);
+    for menu in &found.slot {
+        words(&mut data, menu);
     }
-    data.push(title.len() as u8);
-    data.extend(title.as_bytes());
     data
 }
 
-/// Plans the window. False if this build's code could not be read for it.
-pub fn plan(module: &mut ModuleBuild, window: Option<&Window>, report: &mut Report) -> bool {
-    let Some(window) = window else {
+/// Plans the hooks the in-game loader runs scripts and draws menus with, if any mod
+/// has scripts. False if it has none, or this build's code could not be read for them.
+/// What the controls menu calls a menu: its mod's `controls.<id>` string, or the mod's name,
+/// cut to what the menu takes.
+pub fn label(scripts: &Scripts, mods: &[Mod], owner: &str, id: &str) -> String {
+    let named = scripts
+        .texts
+        .get(owner)
+        .and_then(|t| t.get(&format!("controls.{id}")));
+    let label = named.map_or_else(
+        || {
+            let name = mods.iter().find(|m| m.id == owner).map(|m| m.name.as_str());
+            name.unwrap_or(owner)
+        },
+        String::as_str,
+    );
+    let mut cut = label.to_owned();
+    while cut.len() > super::controls::LABEL {
+        cut.pop();
+    }
+    cut.trim_end().to_owned()
+}
+
+pub fn plan(module: &mut ModuleBuild, scripts: &Scripts, report: &mut Report) -> bool {
+    let (menus, files) = (scripts.menus.len(), scripts.files.len());
+    if files == 0 {
         return false;
-    };
+    }
     let Some(found) = find(module) else {
         report.warn(format!(
-            "{}: could not locate the window code in this build; the stats window is skipped",
+            "{}: could not locate the menu code in this build; scripts do not run",
             module.backend.key()
         ));
         return false;
     };
     let mut hooks = vec![
-        (
-            &found.frame,
-            false,
-            "stats-window",
-            layout(&found, &window.title),
-        ),
-        (
-            &found.hotkeys,
-            false,
-            "stats-hotkey",
-            [&[found.gate][..], &window.scancode.to_le_bytes()].concat(),
-        ),
+        (&found.frame, false, "ui-frame", layout(&found)),
+        (&found.hotkeys, false, "ui-hotkey", vec![found.gate]),
+        (&found.walk, false, "ui-walk", Vec::new()),
     ];
-    hooks.push((&found.walk, false, "stats-walk", Vec::new()));
     for (ask, answer) in &found.asks {
-        hooks.push((ask, true, "stats-open", vec![*answer]));
+        hooks.push((ask, true, "ui-open", vec![*answer]));
     }
     let mut ops = Vec::new();
     for ((site, replaced), after, handler, data) in hooks {
         module.plan.claims.push(Claim {
             start: *site,
             end: site + replaced.len() as u32,
-            owner: "stats window".into(),
+            owner: "scripts".into(),
         });
         ops.push(Op::Context {
             rva: *site,
@@ -668,10 +723,17 @@ pub fn plan(module: &mut ModuleBuild, window: Option<&Window>, report: &mut Repo
         });
     }
     module.plan.groups.push(Group {
-        id: "stats-window".into(),
-        label: format!("stats window on {} [{}]", window.key, window.owner),
+        id: "ui".into(),
+        label: format!("{files} script(s), {menus} menu(s)"),
         ops,
     });
+    let keyed = scripts.menus.iter().filter(|w| w.key.is_some()).count();
+    if keyed > 0 && !super::controls::plan(module, keyed) {
+        report.warn(format!(
+            "{}: could not locate the controls menu's list in this build; menu keys are not listed there",
+            module.backend.key()
+        ));
+    }
     true
 }
 
@@ -692,12 +754,50 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_section() {
-        let parsed = parse(&serde_json::json!({"key": "k", "title": "Gear"}));
-        assert_eq!(parsed, Ok(("K".into(), 14, "GEAR".into())));
-        let parsed = parse(&serde_json::json!({"key": "F2"}));
-        assert_eq!(parsed, Ok(("F2".into(), 59, DEFAULT_TITLE.into())));
-        assert!(parse(&serde_json::json!({"title": "x"})).is_err());
-        assert!(parse(&serde_json::json!({"key": "K", "title": "Ä"})).is_err());
+    fn reads_menus_and_gives_a_shared_key_to_the_later_mod() {
+        use crate::mods::tests::write_mod;
+        use crate::mods::{load, resolve};
+
+        let dir = tempfile::tempdir().unwrap();
+        write_mod(
+            dir.path(),
+            "a",
+            r#"{"schema": 1, "id": "a", "version": "1.0.0", "scripts": ["s.luau"],
+                "menus": [{"id": "gear", "key": "k"}, {"id": "gear"}, {"id": "Bad"},
+                            {"id": "map", "slot": "top"}, {"id": "quiet", "slot": "center"}]}"#,
+        );
+        write_mod(
+            dir.path(),
+            "b",
+            r#"{"schema": 1, "id": "b", "version": "1.0.0",
+                "menus": [{"id": "other", "key": "K"}]}"#,
+        );
+        let mut mods = load(dir.path());
+        let order = resolve(&mut mods, "gh-1");
+        let mut report = Report::default();
+        let menus = collect(&mut mods, &order, &mut report);
+        let summary: Vec<_> = menus
+            .iter()
+            .map(|w| {
+                (
+                    w.owner.as_str(),
+                    w.id.as_str(),
+                    w.slot.as_str(),
+                    w.key.clone(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                ("a", "gear", "left", None),
+                ("a", "quiet", "center", None),
+                ("b", "other", "left", Some(("K".to_owned(), 14))),
+            ]
+        );
+        // the duplicate, the bad id and the bad slot; b's menu has no script
+        assert_eq!(mods[0].warnings.len(), 3);
+        assert_eq!(mods[1].warnings.len(), 1);
+        assert_eq!(report.warnings().count(), 1);
     }
 }

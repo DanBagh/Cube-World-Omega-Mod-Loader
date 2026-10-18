@@ -15,8 +15,9 @@
 //! hooking the client's imports. Nothing in the game folder is changed.
 
 pub mod context;
+pub mod controls;
 pub mod plan;
-pub mod stats;
+pub mod ui;
 
 #[cfg(windows)]
 mod client;
@@ -28,9 +29,13 @@ mod log;
 mod patch;
 #[cfg(windows)]
 mod redirect;
+#[cfg(windows)]
+pub mod script;
 
 /// Folder the plan is read from and the log written to, for running without the app.
 pub const HOME_VARIABLE: &str = "CWOML_HOME";
+/// The folder with the plan and the log, once the loader has found it.
+pub static HOME: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 /// Beside the DLL: a text file whose first line is that folder. The app writes it.
 pub const HOME_FILE: &str = "cwoml.txt";
 pub const PLAN_NAME: &str = "plan.txt";
@@ -52,6 +57,7 @@ mod entry {
     use super::log::{self, log};
     use super::{
         HOME_FILE, HOME_VARIABLE, LOG_NAME, PLAN_NAME, client, forward, patch, plan, redirect,
+        script,
     };
 
     const DLL_PROCESS_DETACH: u32 = 0;
@@ -90,6 +96,7 @@ mod entry {
         let Some(plan) = PLAN.get() else {
             return;
         };
+        script::prepare(plan);
         let done = patch::run(plan);
         if let Ok(mut data) = DATA.lock() {
             *data = done.data;
@@ -106,6 +113,7 @@ mod entry {
             return;
         };
         log::open(&home.join(LOG_NAME));
+        let _ = crate::HOME.set(home.clone());
         log!("cwoml loader {}", env!("CARGO_PKG_VERSION"));
         let path = home.join(PLAN_NAME);
         let read = std::fs::metadata(&path)
