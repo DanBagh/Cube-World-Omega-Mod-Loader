@@ -18,6 +18,7 @@ pub mod pickup_sounds;
 pub mod sound_pitch;
 pub mod sounds;
 pub mod start_screen;
+pub mod stats_window;
 pub mod stub;
 pub mod text;
 pub mod tooltips;
@@ -80,6 +81,15 @@ pub fn contents(found: &Mod) -> Contents {
                 .map_or(0, |pitches| pitches.len()),
         ),
         ("groundModels", found.list("groundModels").len()),
+        (
+            "statsWindow",
+            usize::from(
+                found
+                    .manifest
+                    .get("statsWindow")
+                    .is_some_and(|v| !v.is_null()),
+            ),
+        ),
     ];
     let present = |key: &&str| found.manifest.get(*key).is_some_and(|v| !v.is_null());
     Contents {
@@ -137,6 +147,7 @@ pub fn build(
     let lines = tooltips::collect(mods, &order, &mut report);
     let pickups = pickup_sounds::collect(mods, &order, &mut report);
     let pitches = sound_pitch::collect(mods, &order, &mut report);
+    let window = stats_window::collect(mods, &order, &mut report);
     let converted = work_dir.join(CONVERTED_DIR);
     let mut overrides = files::collect(game, mods, &order, &converted, &mut report);
     let ground = ground_models::collect(mods, &order, &converted, &mut report);
@@ -210,6 +221,12 @@ pub fn build(
         tally("model(s) by amount", planned, ground.len());
         let planned = sound_pitch::plan(&mut module, &pitches, &named, &mut report);
         tally("sound pitch(es)", planned, pitches.len());
+        let planned = stats_window::plan(&mut module, window.as_ref(), &mut report);
+        tally(
+            "stats window(s)",
+            usize::from(planned),
+            usize::from(window.is_some()),
+        );
         start_screen::plan(&mut module, &note, &mut report);
         module.plan.finalize();
         modules.push(module.plan);

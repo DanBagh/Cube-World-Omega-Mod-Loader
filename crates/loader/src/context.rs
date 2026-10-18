@@ -12,6 +12,7 @@
 use std::ffi::c_void;
 
 use crate::plan::MAX_HOOK;
+use crate::stats;
 
 /// The room the code of one hook takes: the replaced instructions and 40 bytes.
 pub const SPACE: usize = (MAX_HOOK + 40).next_multiple_of(16);
@@ -146,15 +147,38 @@ unsafe fn pickup(context: &mut Context, state: *const c_void) {
 pub fn valid(handler: &str, data: &[u8]) -> bool {
     match handler {
         "pickup-sound" => Pickup::read(data).is_some(),
+        "stats-window" => stats::Layout::read(data).is_some(),
+        "stats-hotkey" => stats::Keys::read(data).is_some(),
+        "stats-walk" => data.is_empty(),
+        "stats-open" => stats::Answer::read(data).is_some(),
         _ => false,
     }
 }
 
-/// The record of a hook for `handler`, if its data reads. It lives as long as the
-/// process, and `resume` is to be filled in.
-pub fn hook(handler: &str, data: &[u8]) -> Option<*mut Hook> {
+/// The record of a hook for `handler` in the client at `base`, if its data reads. It lives
+/// as long as the process, and `resume` is to be filled in.
+pub fn hook(handler: &str, data: &[u8], base: usize) -> Option<*mut Hook> {
+    fn leak<T>(state: T) -> *const c_void {
+        Box::into_raw(Box::new(state)).cast()
+    }
+    #[cfg(not(windows))]
+    let _ = base;
     let (run, state): (unsafe fn(&mut Context, *const c_void), *const c_void) = match handler {
-        "pickup-sound" => (pickup, Box::into_raw(Box::new(Pickup::read(data)?)).cast()),
+        "pickup-sound" => (pickup, leak(Pickup::read(data)?)),
+        #[cfg(windows)]
+        "stats-window" => (
+            stats::window,
+            std::ptr::from_ref(stats::Window::new(stats::Layout::read(data)?, base)?).cast(),
+        ),
+        #[cfg(windows)]
+        "stats-hotkey" => (
+            stats::hotkey,
+            leak(stats::Hotkey::new(stats::Keys::read(data)?)),
+        ),
+        #[cfg(windows)]
+        "stats-walk" => (stats::walked, std::ptr::null()),
+        #[cfg(windows)]
+        "stats-open" => (stats::opened, leak(stats::Answer::read(data)?)),
         _ => return None,
     };
     Some(Box::into_raw(Box::new(Hook {
@@ -318,7 +342,7 @@ mod tests {
         assert_eq!(Pickup::read(&data[..data.len() - 1]), None);
         assert!(valid("pickup-sound", &data) && !valid("pickup-sound", &[16, 0x10]));
         assert!(!valid("anything else", &data));
-        assert!(hook("anything else", &data).is_none());
+        assert!(hook("anything else", &data, 0).is_none());
     }
 
     #[cfg(windows)]

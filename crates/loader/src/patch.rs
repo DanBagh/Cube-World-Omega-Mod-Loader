@@ -284,7 +284,7 @@ impl Client {
                 } => {
                     let used = self.code_used.get();
                     let Some(hook) = (used + context::SPACE <= self.code_size)
-                        .then(|| context::hook(handler, data))
+                        .then(|| context::hook(handler, data, self.base as usize))
                         .flatten()
                     else {
                         return false;

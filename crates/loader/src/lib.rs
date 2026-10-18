@@ -16,6 +16,7 @@
 
 pub mod context;
 pub mod plan;
+pub mod stats;
 
 #[cfg(windows)]
 mod client;
